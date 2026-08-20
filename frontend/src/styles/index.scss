@@ -1,0 +1,58 @@
+/**
+ * 全局样式：重置 + 商务简约基础
+ */
+@use './variables.scss' as *;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+  font-size: $font-size-base;
+  color: $color-text-main;
+  background-color: $color-bg-page;
+  -webkit-font-smoothing: antialiased;
+}
+
+// 滚动条
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background-color: $color-border;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+// 通用布局工具类
+.page-container {
+  padding: $space-16;
+}
+
+.card {
+  background-color: $color-bg-card;
+  border: 1px solid $color-border;
+  border-radius: $radius-base;
+  box-shadow: $shadow-card;
+  padding: $space-16;
+}
+
+// 通用间距工具类（间距体系）
+.space-4 { margin: $space-4; }
+.space-8 { margin: $space-8; }
+.space-12 { margin: $space-12; }
+.space-16 { margin: $space-16; }
+.space-20 { margin: $space-20; }
+.space-24 { margin: $space-24; }

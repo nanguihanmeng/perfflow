@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST:mysql}:${DB_PORT:3306}/${DB_NAME:perfflow}?useUnicode=true&characterEncoding=utf8&useSSL=true&serverTimezone=Asia/Shanghai
+    username: ${DB_USER:perfflow}
+    password: ${DB_PWD:perfflow@123}
+
+logging:
+  level:
+    root: WARN
+    com.perfflow: INFO
+  file:
+    name: /var/log/perfflow/perfflow-prod.log

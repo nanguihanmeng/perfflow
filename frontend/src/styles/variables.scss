@@ -1,0 +1,39 @@
+/**
+ * 全局样式变量（商务简约：白底灰框，蓝色点缀）
+ */
+$color-primary: #2b6cb0;
+$color-primary-light: #ebf4ff;
+$color-success: #38a169;
+$color-warning: #d69e2e;
+$color-danger: #e53e3e;
+$color-info: #718096;
+
+$color-text-main: #1a202c;
+$color-text-secondary: #718096;
+$color-text-placeholder: #a0aec0;
+
+$color-border: #e2e8f0;
+$color-bg-page: #f7fafc;
+$color-bg-card: #ffffff;
+
+// 间距体系（8/16/24）
+$space-4: 4px;
+$space-8: 8px;
+$space-12: 12px;
+$space-16: 16px;
+$space-20: 20px;
+$space-24: 24px;
+
+// 字号层级
+$font-size-sm: 13px;
+$font-size-base: 14px;
+$font-size-lg: 16px;
+$font-size-xl: 18px;
+$font-size-2xl: 20px;
+
+// 圆角
+$radius-base: 4px;
+$radius-lg: 8px;
+
+// 阴影
+$shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06);

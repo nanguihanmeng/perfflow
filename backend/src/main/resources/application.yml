@@ -1,0 +1,51 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: perfflow-backend
+  profiles:
+    active: dev
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    default-property-inclusion: non_null
+  servlet:
+    multipart:
+      max-file-size: 20MB
+
+mybatis-plus:
+  mapper-locations: classpath:/mapper/*.xml
+  type-aliases-package: com.perfflow.module.*.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+    jdbc-type-for-null: NULL
+  global-config:
+    db-config:
+      id-type: AUTO
+      logic-delete-field: null
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+perfflow:
+  jwt:
+    secret: perfflow-jwt-secret-please-replace-in-production-this-must-be-at-least-32-bytes-long
+    access-token-ttl-seconds: 7200
+    refresh-token-ttl-seconds: 604800
+    issuer: perfflow
+  scheduler:
+    pending-reminder-cron: "0 0 8 * * ?"
+    pending-auto-push-hour: 23
+  assess:
+    bonus-row-positive-cap: 10
+    bonus-row-seq-from: 8
+    bonus-row-seq-to: 10
+
+logging:
+  level:
+    root: INFO
+    com.perfflow: DEBUG
+    org.springframework.security: INFO
