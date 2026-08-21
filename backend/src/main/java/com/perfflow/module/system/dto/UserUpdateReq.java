@@ -12,7 +12,6 @@ public class UserUpdateReq implements Serializable {
     @Pattern(regexp = "EMP|DEPT_LEAD|LEAD|HR|ADMIN")
     private String role;
     private Long deptId;
-    private Boolean deptLead;
     private String email;
     private String phone;
     private Integer status;

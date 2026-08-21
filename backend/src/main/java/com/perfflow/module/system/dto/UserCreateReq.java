@@ -19,7 +19,6 @@ public class UserCreateReq implements Serializable {
     @Pattern(regexp = "EMP|DEPT_LEAD|LEAD|HR|ADMIN")
     private String role;
     private Long deptId;
-    private Boolean deptLead;
     @Email
     private String email;
     private String phone;

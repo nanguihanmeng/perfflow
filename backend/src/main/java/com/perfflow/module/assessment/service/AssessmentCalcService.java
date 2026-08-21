@@ -36,11 +36,12 @@ public class AssessmentCalcService {
     /**
      * 重算整张主表的自评总分并写入。
      *
-     * <p>规则：
-     * <ol>
-     *   <li>行 self_score 按公式重算；BONUS 行不计入自评总分（领导单独处理）</li>
-     *   <li>self_total_score = SUM(self_score) WHERE category IN (PLAN, OPEN)</li>
-     * </ol>
+     * <p>规则：只对已存在的 self_score 求和（BONUS 行不计入），
+     * 不重算 self_score —— self_score 由调用方按场景决定：
+     * <ul>
+     *   <li>员工改完成率：先按「指标分数 × 完成率%」重算各非 BONUS 行 self_score，再求和</li>
+     *   <li>部门领导改自评得分：直接覆盖 self_score，再求和</li>
+     * </ul>
      */
     @Transactional
     public AssessmentTable recalc(AssessmentTable table) {
@@ -51,22 +52,39 @@ public class AssessmentCalcService {
 
         BigDecimal total = BigDecimal.ZERO;
         for (AssessmentRow r : rows) {
-            // 重算 self_score（PLAN/OPEN 行必须）
             if (RowCategory.BONUS.name().equals(r.getCategory())) {
                 // BONUS 行不计入自评总分
-                r.setSelfScore(null);
-            } else {
-                BigDecimal self = calcSelfScore(r.getBaseScore(), r.getCompletionRate());
-                r.setSelfScore(self);
-                if (self != null) {
-                    total = total.add(self);
-                }
+                continue;
             }
-            rowMapper.updateById(r);
+            if (r.getSelfScore() != null) {
+                total = total.add(r.getSelfScore());
+            }
         }
         table.setSelfTotalScore(total.setScale(2, RoundingMode.HALF_UP));
         tableMapper.updateById(table);
         return table;
+    }
+
+    /**
+     * 按完成率重算表中所有非 BONUS 行的 self_score，并重算总分。
+     *
+     * <p>用于员工填写完成率/提交时。
+     */
+    @Transactional
+    public AssessmentTable recalcByCompletionRate(AssessmentTable table) {
+        List<AssessmentRow> rows = rowMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<AssessmentRow>()
+                        .eq("table_id", table.getId())
+                        .orderByAsc("seq"));
+        for (AssessmentRow r : rows) {
+            if (RowCategory.BONUS.name().equals(r.getCategory())) {
+                r.setSelfScore(null);
+            } else {
+                r.setSelfScore(calcSelfScore(r.getBaseScore(), r.getCompletionRate()));
+            }
+            rowMapper.updateById(r);
+        }
+        return recalc(table);
     }
 
     /**

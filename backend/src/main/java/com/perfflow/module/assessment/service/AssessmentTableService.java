@@ -176,7 +176,7 @@ public class AssessmentTableService {
             r.setFrozen(true);
             rowMapper.updateById(r);
         }
-        calcService.recalc(t);
+        calcService.recalcByCompletionRate(t);
         flowService.writeLog(t, AssessmentState.SELF_DRAFTING, AssessmentState.SELF_SUSPENDED, "SUBMIT");
     }
 
@@ -269,7 +269,8 @@ public class AssessmentTableService {
     /**
      * 为指定员工生成考核主表 + 10 行模板。
      *
-     * <p>userIds 为空时兼容旧逻辑：为所有非 ADMIN 且有部门的启用员工生成。
+     * <p>userIds 为空时兼容旧逻辑：为所有参与考核的启用员工生成。
+     * 仅 EMP 参与考核；HR / ADMIN / LEAD / DEPT_LEAD 均不生成考核表。
      *
      * @param period  考核周期
      * @param userIds 参与考核的员工 ID 列表，为空表示全员
@@ -277,7 +278,7 @@ public class AssessmentTableService {
     @Transactional
     public void initForPeriod(AssessmentPeriod period, List<Long> userIds) {
         QueryWrapper<SysUser> qw = new QueryWrapper<SysUser>()
-                .ne("role", RoleConst.ROLE_ADMIN)
+                .eq("role", RoleConst.ROLE_EMP)
                 .eq("status", 1);
         if (userIds != null && !userIds.isEmpty()) {
             qw.in("id", userIds);
@@ -299,17 +300,11 @@ public class AssessmentTableService {
             t.setSuspendExtendedDays(0);
             tableMapper.insert(t);
 
-            // 创建 10 行模板
-            createRowTemplate(t.getId(), RowCategory.PLAN, 1, 16);
-            createRowTemplate(t.getId(), RowCategory.PLAN, 2, 16);
-            createRowTemplate(t.getId(), RowCategory.PLAN, 3, 16);
-            createRowTemplate(t.getId(), RowCategory.PLAN, 4, 16);
-            createRowTemplate(t.getId(), RowCategory.PLAN, 5, 16);
-            createRowTemplate(t.getId(), RowCategory.OPEN, 6, 10);
-            createRowTemplate(t.getId(), RowCategory.OPEN, 7, 10);
-            createRowTemplate(t.getId(), RowCategory.BONUS, 8, 5);
-            createRowTemplate(t.getId(), RowCategory.BONUS, 9, 5);
-            createRowTemplate(t.getId(), RowCategory.BONUS, 10, 5);
+            // 创建 10 行模板（指标分数默认 0，由 HR 导入时填写）
+            for (int seq = 1; seq <= 10; seq++) {
+                RowCategory cat = seq <= 5 ? RowCategory.PLAN : (seq <= 7 ? RowCategory.OPEN : RowCategory.BONUS);
+                createRowTemplate(t.getId(), cat, seq, 0);
+            }
         }
     }
 
@@ -390,11 +385,12 @@ public class AssessmentTableService {
         return d == null ? null : d.getName();
     }
 
-    /** 部门负责人姓名（dept_lead=1 的部门成员） */
+    /** 部门负责人姓名（每部门唯一的 DEPT_LEAD 角色用户，实时更新） */
     private String lookupDeptLeadName(Long deptId) {
         if (deptId == null) return null;
         SysUser lead = userMapper.selectOne(new QueryWrapper<SysUser>()
-                .eq("dept_id", deptId).eq("dept_lead", 1).last("LIMIT 1"));
+                .eq("dept_id", deptId).eq("role", RoleConst.ROLE_DEPT_LEAD)
+                .eq("status", 1).last("LIMIT 1"));
         return lead == null ? null : lead.getRealName();
     }
 }

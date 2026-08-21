@@ -14,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+
 /**
  * 考核行服务。
  *
@@ -34,14 +36,14 @@ public class AssessmentRowService {
      *
      * <p>可写字段按角色区分：
      * <ul>
-     *   <li>EMP（SELF_DRAFTING，本人）：完成率 completionRate</li>
-     *   <li>DEPT_LEAD（DEPT_REVIEW，本部门）：完成率 completionRate（代替原调分）</li>
+     *   <li>EMP（SELF_DRAFTING，本人）：完成率 completionRate（0-100），自评得分自动算</li>
+     *   <li>DEPT_LEAD（DEPT_REVIEW，本部门）：自评得分 selfScore（0~该行指标分数），直接覆盖</li>
      * </ul>
      * 每次更新后即时重算整表自评总分。
      *
      * @param tableId 主表ID
      * @param rowId   行ID
-     * @param req     更新请求（仅 completionRate）
+     * @param req     更新请求
      */
     @Transactional
     public void update(Long tableId, Long rowId, RowReq req) {
@@ -50,17 +52,38 @@ public class AssessmentRowService {
         if (!perm.canEditRow(t, r)) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
-        if (req.getCompletionRate() == null) {
-            throw new BizException(ResultCode.BAD_REQUEST, "完成率不能为空");
+        if (perm.isEmp()) {
+            // 员工：只改完成率，自评得分自动算
+            if (req.getCompletionRate() == null) {
+                throw new BizException(ResultCode.BAD_REQUEST, "完成率不能为空");
+            }
+            r.setCompletionRate(req.getCompletionRate());
+            r.setSelfScore(AssessmentCalcService.calcSelfScore(r.getBaseScore(), r.getCompletionRate()));
+            rowMapper.updateById(r);
+            // 员工填写主表信息栏：岗位
+            if (req.getPosition() != null && t.getUserId().equals(DataScopeContext.currentUserId())) {
+                t.setPosition(req.getPosition());
+                tableService.updateTablePosition(t);
+            }
+            // 全部行按完成率重算 + 求和（保持整表一致）
+            calcService.recalcByCompletionRate(t);
+        } else if (perm.isDeptLead()) {
+            // 部门领导：直接改自评得分（0~该行指标分数）
+            if (req.getSelfScore() == null) {
+                throw new BizException(ResultCode.BAD_REQUEST, "自评得分不能为空");
+            }
+            BigDecimal max = r.getBaseScore() == null ? BigDecimal.valueOf(100) : r.getBaseScore();
+            if (req.getSelfScore().compareTo(BigDecimal.ZERO) < 0
+                    || req.getSelfScore().compareTo(max) > 0) {
+                throw new BizException(ResultCode.BAD_REQUEST,
+                        "自评得分需在 0-" + max + " 之间");
+            }
+            r.setSelfScore(req.getSelfScore());
+            rowMapper.updateById(r);
+            calcService.recalc(t);
+        } else {
+            throw new BizException(ResultCode.FORBIDDEN);
         }
-        r.setCompletionRate(req.getCompletionRate());
-        // 员工填写主表信息栏：岗位
-        if (req.getPosition() != null && perm.isEmp() && t.getUserId().equals(DataScopeContext.currentUserId())) {
-            t.setPosition(req.getPosition());
-            tableService.updateTablePosition(t);
-        }
-        rowMapper.updateById(r);
-        calcService.recalc(t);
     }
 
     /**

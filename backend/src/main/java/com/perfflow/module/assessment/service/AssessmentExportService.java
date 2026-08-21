@@ -67,7 +67,8 @@ public class AssessmentExportService {
         SysDepartment d = deptMapper.selectById(t.getDeptId());
         SysUser deptLead = t.getDeptId() == null ? null
                 : userMapper.selectOne(new QueryWrapper<SysUser>()
-                        .eq("dept_id", t.getDeptId()).eq("dept_lead", 1).last("LIMIT 1"));
+                        .eq("dept_id", t.getDeptId()).eq("role", "DEPT_LEAD")
+                        .eq("status", 1).last("LIMIT 1"));
 
         String realName = u == null ? "" : u.getRealName();
         String deptName = d == null ? "" : d.getName();
@@ -136,7 +137,8 @@ public class AssessmentExportService {
             SysUser u = userMapper.selectById(t.getUserId());
             SysDepartment d = deptMapper.selectById(t.getDeptId());
             SysUser deptLead = d == null ? null : userMapper.selectOne(new QueryWrapper<SysUser>()
-                    .eq("dept_id", t.getDeptId()).eq("dept_lead", 1).last("LIMIT 1"));
+                    .eq("dept_id", t.getDeptId()).eq("role", "DEPT_LEAD")
+                    .eq("status", 1).last("LIMIT 1"));
             String realName = u == null ? "" : u.getRealName();
             String deptName = d == null ? "" : d.getName();
             String deptLeadName = deptLead == null ? "" : deptLead.getRealName();

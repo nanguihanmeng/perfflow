@@ -11,7 +11,11 @@ import java.math.BigDecimal;
 /**
  * 行更新请求。
  *
- * <p>只允许改完成率（0-100）；自评得分由后端自动计算，岗位在信息栏单独维护。
+ * <p>按角色分流：
+ * <ul>
+ *   <li>EMP：completionRate（0-100），自评得分由后端自动算</li>
+ *   <li>DEPT_LEAD：selfScore（0~该行指标分数），直接覆盖自评得分</li>
+ * </ul>
  */
 @Data
 public class RowReq implements Serializable {
@@ -19,6 +23,9 @@ public class RowReq implements Serializable {
     @DecimalMin("0")
     @DecimalMax("100")
     private BigDecimal completionRate;
+
+    @DecimalMin("0")
+    private BigDecimal selfScore;
 
     @Size(max = 50)
     private String position;

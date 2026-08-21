@@ -99,12 +99,13 @@ public class SysUserService {
         u.setRealName(req.getRealName());
         u.setRole(req.getRole());
         u.setDeptId(req.getDeptId());
-        u.setDeptLead(Boolean.TRUE.equals(req.getDeptLead()));
         u.setEmail(req.getEmail());
         u.setPhone(req.getPhone());
         u.setStatus(1);
         u.setMustChangePassword(true);
         u.setPassword(passwordEncoder.encode(DEFAULT_PWD));
+        // 部门负责人唯一：每个部门至多一名 DEPT_LEAD
+        ensureDeptLeadUnique(req.getRole(), req.getDeptId(), null);
         userMapper.insert(u);
         return u.getId();
     }
@@ -116,11 +117,38 @@ public class SysUserService {
         if (req.getRealName() != null) u.setRealName(req.getRealName());
         if (req.getRole() != null) u.setRole(req.getRole());
         if (req.getDeptId() != null) u.setDeptId(req.getDeptId());
-        if (req.getDeptLead() != null) u.setDeptLead(req.getDeptLead());
         if (req.getEmail() != null) u.setEmail(req.getEmail());
         if (req.getPhone() != null) u.setPhone(req.getPhone());
         if (req.getStatus() != null) u.setStatus(req.getStatus());
+        // 部门负责人唯一：改为 DEPT_LEAD 时校验该部门
+        ensureDeptLeadUnique(req.getRole() != null ? req.getRole() : u.getRole(),
+                req.getDeptId() != null ? req.getDeptId() : u.getDeptId(), id);
         userMapper.updateById(u);
+    }
+
+    /**
+     * 部门负责人唯一校验：每个部门至多一名 DEPT_LEAD 角色用户。
+     *
+     * @param role     新角色
+     * @param deptId   新部门
+     * @param excludeId 编辑时排除的自身ID（新增传 null）
+     */
+    private void ensureDeptLeadUnique(String role, Long deptId, Long excludeId) {
+        if (!RoleConst.ROLE_DEPT_LEAD.equals(role) || deptId == null) {
+            return;
+        }
+        QueryWrapper<SysUser> qw = new QueryWrapper<SysUser>()
+                .eq("role", RoleConst.ROLE_DEPT_LEAD)
+                .eq("dept_id", deptId)
+                .ne("status", 0);
+        if (excludeId != null) {
+            qw.ne("id", excludeId);
+        }
+        SysUser exist = userMapper.selectOne(qw.last("LIMIT 1"));
+        if (exist != null) {
+            throw new BizException(ResultCode.BAD_REQUEST,
+                    "该部门已有部门负责人：" + exist.getRealName());
+        }
     }
 
     @Transactional

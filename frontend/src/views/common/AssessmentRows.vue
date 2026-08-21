@@ -3,15 +3,19 @@
  * 考核行表格组件（模板 A1:G16 样式）
  * - 信息栏：部门 / 被考核人 / 岗位(可填) / 部门负责人
  * - 10 行数据：序号 / 指标类别 / 指标名称 / 指标分数 / 工作目标 / 评分标准 / 完成率 / 自评得分
- * - 编辑模式（EMP 自评 / DEPT_LEAD 部门审核）：仅可填完成率（0-100），自评得分由后端自动算
+ * - 编辑模式按角色分流：
+ *   - EMP（自评中）：编辑完成率（0-100），自评得分后端自动算
+ *   - DEPT_LEAD（部门审核）：编辑自评得分（0~该行指标分数），直接覆盖
  * - 行结果（考核结果）只与总分相关，行级不展示、不可写
  */
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import type { RowResp } from '@/types/dto'
 import { RowCategoryLabel } from '@/types/role'
 import { updateRowApi } from '@/api/assessment.api'
-import { isCompletionRateValid } from '@/utils/validate'
+import { isCompletionRateValid, isScoreInRange } from '@/utils/validate'
 import { toastError, toastSuccess } from '@/utils/message'
+import { useAuthStore } from '@/store/auth'
+import { Role } from '@/types/enums'
 import ScoreDisplay from '@/components/common/ScoreDisplay.vue'
 
 interface Props {
@@ -19,7 +23,7 @@ interface Props {
   tableId: number
   /** 考核行列表 */
   rows: RowResp[]
-  /** 是否允许编辑完成率（EMP 自评 / DEPT_LEAD 部门审核） */
+  /** 是否允许编辑（EMP 自评 / DEPT_LEAD 部门审核） */
   editable?: boolean
 }
 
@@ -31,6 +35,9 @@ const emit = defineEmits<{
   refresh: []
 }>()
 
+const authStore = useAuthStore()
+const isDeptLead = computed(() => authStore.role === Role.DEPT_LEAD)
+
 const categoryLabel = (cat: string): string => RowCategoryLabel[cat] ?? cat
 
 /** 正在编辑的行 ID */
@@ -39,14 +46,14 @@ const editingRowId = ref<number | null>(null)
 /** 保存中的行 ID */
 const savingRowId = ref<number | null>(null)
 
-/** 编辑态草稿（仅完成率） */
+/** 编辑态草稿（按角色：完成率 或 自评得分） */
 const draft = reactive({
-  completionRate: ''
+  value: ''
 })
 
 const startEdit = (row: RowResp): void => {
   editingRowId.value = row.id
-  draft.completionRate = row.completionRate ?? ''
+  draft.value = isDeptLead.value ? (row.selfScore ?? '') : (row.completionRate ?? '')
 }
 
 const cancelEdit = (): void => {
@@ -54,16 +61,31 @@ const cancelEdit = (): void => {
 }
 
 const saveRow = async (row: RowResp): Promise<void> => {
-  // 完成率 0-100 校验
-  if (draft.completionRate !== '' && !isCompletionRateValid(draft.completionRate)) {
-    toastError('完成率必须在 0-100 之间')
-    return
+  if (isDeptLead.value) {
+    // 部门领导：自评得分 0~指标分数
+    const max = Number(row.baseScore ?? 100)
+    if (draft.value !== '' && !isScoreInRange(draft.value, 0, max)) {
+      toastError(`自评得分必须在 0-${max} 之间`)
+      return
+    }
+  } else {
+    // 员工：完成率 0-100
+    if (draft.value !== '' && !isCompletionRateValid(draft.value)) {
+      toastError('完成率必须在 0-100 之间')
+      return
+    }
   }
   savingRowId.value = row.id
   try {
-    await updateRowApi(props.tableId, row.id, {
-      completionRate: draft.completionRate || undefined
-    })
+    if (isDeptLead.value) {
+      await updateRowApi(props.tableId, row.id, {
+        selfScore: draft.value || undefined
+      })
+    } else {
+      await updateRowApi(props.tableId, row.id, {
+        completionRate: draft.value || undefined
+      })
+    }
     editingRowId.value = null
     toastSuccess('保存成功')
     emit('refresh')
@@ -117,8 +139,8 @@ const spanMethod = ({ row, columnIndex }: { row: RowResp; columnIndex: number })
       </el-table-column>
       <el-table-column label="完成率" width="100" align="center">
         <template #default="{ row }">
-          <template v-if="editable && editingRowId === row.id">
-            <el-input v-model="draft.completionRate" placeholder="0-100" size="small" />
+          <template v-if="editable && !isDeptLead && editingRowId === row.id">
+            <el-input v-model="draft.value" placeholder="0-100" size="small" />
           </template>
           <template v-else>
             {{ row.completionRate ? `${row.completionRate}%` : '—' }}
@@ -127,7 +149,12 @@ const spanMethod = ({ row, columnIndex }: { row: RowResp; columnIndex: number })
       </el-table-column>
       <el-table-column label="自评得分" width="90" align="center">
         <template #default="{ row }">
-          <ScoreDisplay :value="row.selfScore" :masked="row.masked" />
+          <template v-if="editable && isDeptLead && editingRowId === row.id">
+            <el-input v-model="draft.value" :placeholder="`0-${row.baseScore ?? 100}`" size="small" />
+          </template>
+          <template v-else>
+            <ScoreDisplay :value="row.selfScore" :masked="row.masked" />
+          </template>
         </template>
       </el-table-column>
       <el-table-column v-if="editable" label="操作" width="90" align="center" fixed="right">

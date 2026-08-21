@@ -109,9 +109,9 @@ const submitReject = async (): Promise<void> => {
 }
 
 const handleApprove = async (): Promise<void> => {
-  await confirmAction('确认通过该考核表并进入领导评分？')
+  await confirmAction('确认提交该考核表给领导评分？提交后不可再修改。')
   await approveTableApi(tableId)
-  toastSuccess('已通过')
+  toastSuccess('已提交给领导评分')
   await loadTable()
 }
 
@@ -244,7 +244,7 @@ const goBack = (): void => {
         <div class="detail-info__actions">
           <el-button v-if="canSubmit" type="primary" @click="handleSubmit">提交</el-button>
           <el-button v-if="canPush" type="primary" @click="handlePush">推送到部门审核</el-button>
-          <el-button v-if="canApprove" type="success" @click="handleApprove">通过</el-button>
+          <el-button v-if="canApprove" type="success" @click="handleApprove">提交</el-button>
           <el-button v-if="canApprove" type="danger" plain @click="openReject">打回</el-button>
           <el-button v-if="canLeadScore" type="primary" @click="openLeadScore">领导评分</el-button>
           <el-button v-if="canExtend" plain @click="openExtend">延长挂起</el-button>

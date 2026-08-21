@@ -48,7 +48,6 @@ const form = reactive<{
   realName: string
   role: Role
   deptId: number | null
-  deptLead: boolean
   email: string
   phone: string
   status: UserStatus
@@ -57,7 +56,6 @@ const form = reactive<{
   realName: '',
   role: Role.EMP,
   deptId: null,
-  deptLead: false,
   email: '',
   phone: '',
   status: UserStatus.ENABLED
@@ -69,7 +67,6 @@ const openCreate = (): void => {
   form.realName = ''
   form.role = Role.EMP
   form.deptId = null
-  form.deptLead = false
   form.email = ''
   form.phone = ''
   form.status = UserStatus.ENABLED
@@ -82,7 +79,6 @@ const openEdit = (row: UserResp): void => {
   form.realName = row.realName
   form.role = row.role
   form.deptId = row.deptId
-  form.deptLead = row.deptLead
   form.email = row.email ?? ''
   form.phone = row.phone ?? ''
   form.status = row.status
@@ -101,7 +97,6 @@ const submitForm = async (): Promise<void> => {
         realName: form.realName.trim(),
         role: form.role,
         deptId: form.deptId,
-        deptLead: form.deptLead,
         email: form.email || null,
         phone: form.phone || null
       }
@@ -112,7 +107,6 @@ const submitForm = async (): Promise<void> => {
         realName: form.realName.trim(),
         role: form.role,
         deptId: form.deptId,
-        deptLead: form.deptLead,
         email: form.email || null,
         phone: form.phone || null,
         status: form.status
@@ -199,9 +193,6 @@ const handleSearch = (): void => {
         <el-table-column prop="deptName" label="部门" width="130">
           <template #default="{ row }">{{ row.deptName || '—' }}</template>
         </el-table-column>
-        <el-table-column label="部门负责人" width="100" align="center">
-          <template #default="{ row }">{{ row.deptLead ? '是' : '否' }}</template>
-        </el-table-column>
         <el-table-column prop="email" label="邮箱" min-width="140">
           <template #default="{ row }">{{ row.email || '—' }}</template>
         </el-table-column>
@@ -259,9 +250,6 @@ const handleSearch = (): void => {
           <el-select v-model="form.deptId" clearable placeholder="无部门" style="width: 100%">
             <el-option v-for="d in deptOptions" :key="d.id" :label="d.name" :value="d.id" />
           </el-select>
-        </el-form-item>
-        <el-form-item label="部门负责人">
-          <el-switch v-model="form.deptLead" />
         </el-form-item>
         <el-form-item label="邮箱">
           <el-input v-model="form.email" maxlength="128" />

@@ -126,9 +126,10 @@ export interface RowResp {
   masked: boolean
 }
 
-/** 更新行（仅完成率 0-100 / 岗位，得分后端自动算） */
+/** 更新行（EMP 改完成率 / DEPT_LEAD 改自评得分 / 岗位） */
 export interface RowReq {
   completionRate?: string
+  selfScore?: string
   position?: string
 }
 
@@ -200,7 +201,6 @@ export interface UserCreateReq {
   realName: string
   role: Role
   deptId?: number | null
-  deptLead?: boolean
   email?: string | null
   phone?: string | null
 }
@@ -209,7 +209,6 @@ export interface UserUpdateReq {
   realName: string
   role: Role
   deptId?: number | null
-  deptLead?: boolean
   email?: string | null
   phone?: string | null
   status: UserStatus

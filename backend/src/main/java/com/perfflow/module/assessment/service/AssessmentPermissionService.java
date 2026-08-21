@@ -96,8 +96,19 @@ public class AssessmentPermissionService {
     public boolean isRowMasked(AssessmentTable t) {
         String role = currentRole();
         if (role == null) return true;
-        // 只有 LEAD / HR 可见全量；EMP / DEPT_LEAD 看任何人均脱敏（包括自己）
-        return RoleConst.ROLE_LEAD.equals(role) || RoleConst.ROLE_HR.equals(role) ? false : true;
+        switch (role) {
+            // 员工本人 / 本部门领导 / LEAD / HR 可见自评得分
+            case RoleConst.ROLE_LEAD, RoleConst.ROLE_HR -> { return false; }
+            case RoleConst.ROLE_EMP -> {
+                Long uid = DataScopeContext.currentUserId();
+                return uid == null || !uid.equals(t.getUserId());
+            }
+            case RoleConst.ROLE_DEPT_LEAD -> {
+                Long deptId = DataScopeContext.currentDeptId();
+                return deptId == null || !deptId.equals(t.getDeptId());
+            }
+            default -> { return true; }
+        }
     }
 
     /**
