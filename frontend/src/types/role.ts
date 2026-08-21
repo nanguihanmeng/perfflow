@@ -8,7 +8,7 @@ export const RoleLabel: Record<RoleType, string> = {
   [Role.EMP]: '员工',
   [Role.DEPT_LEAD]: '部门领导',
   [Role.LEAD]: '公司领导',
-  [Role.HR]: '人事',
+  [Role.PERFORMANCE_HR]: '绩效考核管理员',
   [Role.ADMIN]: '系统管理员'
 }
 

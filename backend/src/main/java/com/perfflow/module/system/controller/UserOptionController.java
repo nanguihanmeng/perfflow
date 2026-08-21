@@ -19,7 +19,7 @@ import java.util.List;
 @Tag(name = "员工选项")
 @RestController
 @RequestMapping("/users/options")
-@PreAuthorize("hasRole('HR')")
+@PreAuthorize("hasRole('PERFORMANCE_HR')")
 @RequiredArgsConstructor
 public class UserOptionController {
 

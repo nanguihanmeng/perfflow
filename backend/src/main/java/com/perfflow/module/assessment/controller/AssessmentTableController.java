@@ -41,7 +41,7 @@ public class AssessmentTableController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "删除主表（HR，级联删除行与流程日志）")
-    @PreAuthorize("hasRole('HR')")
+    @PreAuthorize("hasRole('PERFORMANCE_HR')")
     public Result<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return Result.ok();
@@ -49,7 +49,7 @@ public class AssessmentTableController {
 
     @PostMapping(value = "/{id}/import", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "导入考核明细（HR，模板A1:G16格式xlsx）")
-    @PreAuthorize("hasRole('HR')")
+    @PreAuthorize("hasRole('PERFORMANCE_HR')")
     public Result<Void> importRows(@PathVariable Long id,
                                    @org.springframework.web.bind.annotation.RequestParam("file")
                                    org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
@@ -66,7 +66,7 @@ public class AssessmentTableController {
 
     @PostMapping("/{id}/push")
     @Operation(summary = "人事确认推送（SELF_SUSPENDED -> DEPT_REVIEW）")
-    @PreAuthorize("hasRole('HR')")
+    @PreAuthorize("hasRole('PERFORMANCE_HR')")
     public Result<Void> push(@PathVariable Long id) {
         service.push(id);
         return Result.ok();
@@ -101,7 +101,7 @@ public class AssessmentTableController {
 
     @PostMapping("/{id}/extend-suspend")
     @Operation(summary = "延长挂起时间（HR/ADMIN）")
-    @PreAuthorize("hasAnyRole('HR','ADMIN')")
+    @PreAuthorize("hasAnyRole('PERFORMANCE_HR','ADMIN')")
     public Result<Void> extend(@PathVariable Long id,
                                @Valid @RequestBody ExtendSuspendReq req) {
         service.extendSuspend(id, req.getDays(), req.getReason());

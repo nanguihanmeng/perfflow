@@ -251,7 +251,7 @@ public class AssessmentTableService {
     public void extendSuspend(Long tableId, int days, String reason) {
         AssessmentTable t = getRequired(tableId);
         String role = perm.currentRole();
-        if (!RoleConst.ROLE_HR.equals(role) && !RoleConst.ROLE_ADMIN.equals(role)) {
+        if (!RoleConst.ROLE_PERFORMANCE_HR.equals(role) && !RoleConst.ROLE_ADMIN.equals(role)) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
         int next = (t.getSuspendExtendedDays() == null ? 0 : t.getSuspendExtendedDays()) + days;
@@ -265,6 +265,34 @@ public class AssessmentTableService {
     }
 
     // ==================== 模板初始化 ====================
+
+    /**
+     * 查询某周期某员工的考核主表。
+     *
+     * @param periodId 周期ID
+     * @param userId   员工ID
+     * @return 主表或 null
+     */
+    public AssessmentTable findByPeriodAndUser(Long periodId, Long userId) {
+        return tableMapper.selectOne(new QueryWrapper<AssessmentTable>()
+                .eq("period_id", periodId).eq("user_id", userId).last("LIMIT 1"));
+    }
+
+    /**
+     * 查询某考核表全部行（按 seq 升序）。
+     */
+    public List<AssessmentRow> listRows(Long tableId) {
+        return rowMapper.selectList(
+                new QueryWrapper<AssessmentRow>().eq("table_id", tableId).orderByAsc("seq"));
+    }
+
+    /**
+     * 更新考核行（周期导入写入明细用）。
+     */
+    @Transactional
+    public void updateRow(AssessmentRow row) {
+        rowMapper.updateById(row);
+    }
 
     /**
      * 为指定员工生成考核主表 + 10 行模板。

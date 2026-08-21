@@ -20,6 +20,15 @@ export const createPeriodApi = (data: PeriodCreateReq): Promise<Result<number>> 
 export const openPeriodApi = (id: number, userIds?: number[]): Promise<Result<void>> =>
   request.post<void>(`/periods/${id}/open`, userIds && userIds.length > 0 ? { userIds } : {})
 
+/** 导入周期考核明细（员工+明细一个文件，返回参与员工ID） */
+export const importPeriodApi = (id: number, file: File): Promise<Result<number[]>> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request.post<number[]>('/periods/' + id + '/import', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
 /** 关闭周期 */
 export const closePeriodApi = (id: number): Promise<Result<void>> =>
   request.post<void>(`/periods/${id}/close`)

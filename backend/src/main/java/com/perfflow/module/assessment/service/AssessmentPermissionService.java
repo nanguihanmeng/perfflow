@@ -44,7 +44,7 @@ public class AssessmentPermissionService {
     public boolean isEmp()     { return RoleConst.ROLE_EMP.equals(currentRole()); }
     public boolean isDeptLead(){ return RoleConst.ROLE_DEPT_LEAD.equals(currentRole()); }
     public boolean isLead()    { return RoleConst.ROLE_LEAD.equals(currentRole()); }
-    public boolean isHr()      { return RoleConst.ROLE_HR.equals(currentRole()); }
+    public boolean isHr()      { return RoleConst.ROLE_PERFORMANCE_HR.equals(currentRole()); }
 
     /** 当前用户是否能查看指定行主表 */
     public void ensureVisible(AssessmentTable t) {
@@ -53,7 +53,7 @@ public class AssessmentPermissionService {
             throw new BizException(ResultCode.UNAUTHORIZED);
         }
         switch (role) {
-            case RoleConst.ROLE_LEAD, RoleConst.ROLE_HR -> { /* all */ }
+            case RoleConst.ROLE_LEAD, RoleConst.ROLE_PERFORMANCE_HR -> { /* all */ }
             case RoleConst.ROLE_DEPT_LEAD -> {
                 Long uid = DataScopeContext.currentDeptId();
                 if (uid == null || !uid.equals(t.getDeptId())) {
@@ -98,7 +98,7 @@ public class AssessmentPermissionService {
         if (role == null) return true;
         switch (role) {
             // 员工本人 / 本部门领导 / LEAD / HR 可见自评得分
-            case RoleConst.ROLE_LEAD, RoleConst.ROLE_HR -> { return false; }
+            case RoleConst.ROLE_LEAD, RoleConst.ROLE_PERFORMANCE_HR -> { return false; }
             case RoleConst.ROLE_EMP -> {
                 Long uid = DataScopeContext.currentUserId();
                 return uid == null || !uid.equals(t.getUserId());
@@ -121,7 +121,7 @@ public class AssessmentPermissionService {
             return qw;
         }
         switch (role) {
-            case RoleConst.ROLE_LEAD, RoleConst.ROLE_HR -> { return qw; }
+            case RoleConst.ROLE_LEAD, RoleConst.ROLE_PERFORMANCE_HR -> { return qw; }
             case RoleConst.ROLE_DEPT_LEAD -> {
                 Long deptId = DataScopeContext.currentDeptId();
                 if (deptId != null) qw.eq("dept_id", deptId);

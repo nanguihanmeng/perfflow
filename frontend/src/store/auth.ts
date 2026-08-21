@@ -39,7 +39,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isEmployee = computed(() => role.value === Role.EMP)
   const isDeptLead = computed(() => role.value === Role.DEPT_LEAD)
   const isLeader = computed(() => role.value === Role.LEAD)
-  const isHr = computed(() => role.value === Role.HR)
+  const isHr = computed(() => role.value === Role.PERFORMANCE_HR)
 
   /** 登录成功：保存令牌与用户快照 */
   const setLogin = (data: LoginResp): void => {
@@ -60,6 +60,15 @@ export const useAuthStore = defineStore('auth', () => {
     user.value.deptId = snapshot.deptId
     user.value.deptLead = snapshot.deptLead
     user.value.mustChangePassword = snapshot.mustChangePassword
+  }
+
+  /** 修改资料后本地刷新真实姓名 */
+  const applyProfile = (realName: string): void => {
+    if (!user.value) {
+      return
+    }
+    user.value.realName = realName
+    localStorage.setItem(USER_KEY, JSON.stringify(user.value))
   }
 
   /** 登出：清空本地状态并调用后端（语义兼容） */
@@ -88,6 +97,7 @@ export const useAuthStore = defineStore('auth', () => {
     isHr,
     setLogin,
     applySnapshot,
+    applyProfile,
     logout
   }
 })

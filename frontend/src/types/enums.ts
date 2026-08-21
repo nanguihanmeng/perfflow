@@ -7,7 +7,8 @@ export const Role = {
   EMP: 'EMP',
   DEPT_LEAD: 'DEPT_LEAD',
   LEAD: 'LEAD',
-  HR: 'HR',
+  /** 绩效考核管理员：发布周期、收集/导入考核表（最高权限，不参与考核） */
+  PERFORMANCE_HR: 'PERFORMANCE_HR',
   ADMIN: 'ADMIN'
 } as const
 export type Role = (typeof Role)[keyof typeof Role]

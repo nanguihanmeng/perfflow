@@ -17,7 +17,7 @@ import java.io.OutputStream;
 @RestController
 @RequestMapping("/assessment-tables/export")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('HR')")
+@PreAuthorize("hasRole('PERFORMANCE_HR')")
 public class AssessmentExportController {
 
     private final AssessmentExportService exportService;

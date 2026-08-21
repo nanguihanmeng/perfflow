@@ -4,11 +4,11 @@
  */
 import { nextTick, onMounted, reactive, ref } from 'vue'
 import type { TableInstance } from 'element-plus'
-import { createPeriodApi, getPeriodListApi, openPeriodApi, closePeriodApi } from '@/api/period.api'
+import { createPeriodApi, getPeriodListApi, openPeriodApi, closePeriodApi, importPeriodApi } from '@/api/period.api'
 import { getUserOptionsApi } from '@/api/system.api'
 import type { PeriodCreateReq, PeriodResp, UserResp } from '@/types/dto'
 import { PeriodStatus } from '@/types/enums'
-import { confirmAction, toastSuccess } from '@/utils/message'
+import { confirmAction, toastError, toastSuccess } from '@/utils/message'
 import { formatDate } from '@/utils/format'
 import PageHeader from '@/components/common/PageHeader.vue'
 
@@ -138,6 +138,35 @@ const submitOpen = async (): Promise<void> => {
   }
 }
 
+/* ---------------- 导入 Excel（员工+明细一个文件） ---------------- */
+const importLoading = ref(false)
+
+const onImportFile = async (file: File): Promise<void> => {
+  if (!openTarget.value) {
+    return
+  }
+  importLoading.value = true
+  try {
+    const res = await importPeriodApi(openTarget.value.id, file)
+    const ids = res.data
+    // 导入成功：勾选导入的员工
+    selectedIds.value = ids
+    // 同步勾选到表格（重新渲染后全不选，再手动勾选导入员工）
+    await nextTick()
+    empTableRef.value?.clearSelection()
+    empOptions.value.forEach((u) => {
+      if (ids.includes(u.id)) {
+        empTableRef.value?.toggleRowSelection(u, true)
+      }
+    })
+    toastSuccess(`已导入 ${ids.length} 名员工的考核明细`)
+  } catch (e) {
+    toastError('导入失败，请检查 Excel 格式')
+  } finally {
+    importLoading.value = false
+  }
+}
+
 const handleClose = async (row: PeriodResp): Promise<void> => {
   await confirmAction(`确认关闭周期「${row.name}」？`)
   await closePeriodApi(row.id)
@@ -246,9 +275,24 @@ const handleClose = async (row: PeriodResp): Promise<void> => {
         type="info"
         :closable="false"
         show-icon
-        title="仅勾选的员工需要填写该周期考核表；未勾选的不参与。"
+        title="仅勾选的员工需要填写该周期考核表；未勾选的不参与。也可通过 Excel 一次性导入员工与考核明细。"
         style="margin-bottom: 12px"
       />
+      <el-upload
+        :show-file-list="false"
+        :auto-upload="false"
+        accept=".xlsx,.xls"
+        :on-change="(file: any) => onImportFile(file.raw)"
+        style="margin-bottom: 12px"
+      >
+        <el-button :loading="importLoading" plain>导入 Excel（员工+考核明细）</el-button>
+        <template #tip>
+          <div class="el-upload__tip" style="line-height: 1.6">
+            Excel 格式：A 列为员工登录名（每员工 10 行首行标注），B-G 列为序号/指标类别/指标名称/指标分数/工作目标/评分标准。
+            导入后自动勾选对应员工并写入考核明细。
+          </div>
+        </template>
+      </el-upload>
       <el-table
         ref="empTableRef"
         v-loading="empLoading"

@@ -78,19 +78,19 @@ export const routes: RouteRecordRaw[] = [
         name: 'PeriodManage',
         component: () => import('@/views/hr/PeriodManage.vue'),
         // 注意：后端拦截器禁止 ADMIN 访问 /periods/**，故仅 HR 可见
-        meta: { title: '周期管理', roles: [Role.HR], adminDenied: true }
+        meta: { title: '周期管理', roles: [Role.PERFORMANCE_HR], adminDenied: true }
       },
       {
         path: 'hr/list',
         name: 'AssessmentList',
         component: () => import('@/views/hr/AssessmentList.vue'),
-        meta: { title: '考核列表', roles: [Role.LEAD, Role.HR], adminDenied: true }
+        meta: { title: '考核列表', roles: [Role.LEAD, Role.PERFORMANCE_HR], adminDenied: true }
       },
       {
         path: 'hr/table/:id',
         name: 'AssessmentTableDetail',
         component: () => import('@/views/common/AssessmentDetail.vue'),
-        meta: { title: '考核详情', roles: [Role.LEAD, Role.HR], adminDenied: true }
+        meta: { title: '考核详情', roles: [Role.LEAD, Role.PERFORMANCE_HR], adminDenied: true }
       },
       {
         path: 'admin/users',

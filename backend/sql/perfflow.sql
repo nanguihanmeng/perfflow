@@ -147,10 +147,10 @@ INSERT INTO `sys_department`(`id`,`name`,`parent_id`,`sort`) VALUES
   (2,'产品部', 0, 2),
   (3,'人事部', 0, 3);
 
--- admin / hr / leader / 部门负责人 / 员工（HR 与 ADMIN 无部门、不参与考核）
+-- admin / hr / leader / 部门负责人 / 员工（绩效考核管理员与 ADMIN 无部门、不参与考核）
 INSERT INTO `sys_user`(`id`,`username`,`password`,`real_name`,`role`,`dept_id`,`dept_lead`,`status`,`must_change_password`) VALUES
   (1,'admin',     '$2a$10$nP/hgmM0jVYi89G/cCItmuSxhDLw90tCw8NFs3lXBi7FpgUYtLmhC','系统管理员','ADMIN',     NULL, 0, 1, 1),
-  (2,'hr',        '$2a$10$nP/hgmM0jVYi89G/cCItmuSxhDLw90tCw8NFs3lXBi7FpgUYtLmhC','人事小李',  'HR',        NULL, 0, 1, 1),
+  (2,'hr',        '$2a$10$nP/hgmM0jVYi89G/cCItmuSxhDLw90tCw8NFs3lXBi7FpgUYtLmhC','人事小李',  'PERFORMANCE_HR', NULL, 0, 1, 1),
   (3,'leader',    '$2a$10$nP/hgmM0jVYi89G/cCItmuSxhDLw90tCw8NFs3lXBi7FpgUYtLmhC','王总监',   'LEAD',       NULL, 0, 1, 1),
   (6,'emp01',     '$2a$10$nP/hgmM0jVYi89G/cCItmuSxhDLw90tCw8NFs3lXBi7FpgUYtLmhC','赵一',     'EMP',        1,    0, 1, 1),
   (7,'emp02',     '$2a$10$nP/hgmM0jVYi89G/cCItmuSxhDLw90tCw8NFs3lXBi7FpgUYtLmhC','钱二',     'EMP',        1,    0, 1, 1),

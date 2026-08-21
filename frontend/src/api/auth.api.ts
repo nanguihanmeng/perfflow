@@ -2,7 +2,7 @@
  * 鉴权模块接口（/auth）
  */
 import { request } from '@/utils/request'
-import type { ChangePasswordReq, CurrentUserSnapshot, LoginReq, LoginResp, RefreshReq } from '@/types/dto'
+import type { ChangePasswordReq, CurrentUserSnapshot, LoginReq, LoginResp, ProfileReq, RefreshReq } from '@/types/dto'
 import type { Result } from '@/types/result'
 
 /** 登录 */
@@ -26,3 +26,7 @@ export const logoutApi = (): Promise<Result<void>> => request.post<void>('/auth/
  */
 export const changePasswordApi = (data: ChangePasswordReq): Promise<Result<void>> =>
   request.put<void>('/auth/password', data, { silent: true })
+
+/** 修改个人资料（姓名/邮箱/电话） */
+export const updateProfileApi = (data: ProfileReq): Promise<Result<void>> =>
+  request.put<void>('/auth/profile', data)

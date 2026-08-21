@@ -15,7 +15,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/assessment-tables/{id}/logs")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('HR','LEAD','DEPT_LEAD')")
+@PreAuthorize("hasAnyRole('PERFORMANCE_HR','LEAD','DEPT_LEAD')")
 public class AssessmentFlowController {
 
     private final AssessmentFlowService flowService;

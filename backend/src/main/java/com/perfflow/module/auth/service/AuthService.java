@@ -4,6 +4,7 @@ import com.perfflow.common.api.ResultCode;
 import com.perfflow.common.exception.BizException;
 import com.perfflow.module.auth.dto.LoginReq;
 import com.perfflow.module.auth.dto.LoginResp;
+import com.perfflow.module.auth.dto.ProfileReq;
 import com.perfflow.module.system.entity.SysDepartment;
 import com.perfflow.module.system.entity.SysUser;
 import com.perfflow.module.system.mapper.SysDepartmentMapper;
@@ -93,6 +94,29 @@ public class AuthService {
         }
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setMustChangePassword(false);
+        userMapper.updateById(user);
+    }
+
+    /**
+     * 修改当前登录用户的个人资料（姓名/邮箱/电话）。
+     *
+     * <p>绩效考核管理员账号信息变更的唯一渠道：登录后自行修改。
+     *
+     * @param req 资料请求
+     */
+    @Transactional
+    public void updateProfile(ProfileReq req) {
+        Long userId = DataScopeContext.currentUserId();
+        if (userId == null) {
+            throw new BizException(ResultCode.UNAUTHORIZED);
+        }
+        SysUser user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
+        if (req.getRealName() != null) user.setRealName(req.getRealName());
+        if (req.getEmail() != null) user.setEmail(req.getEmail());
+        if (req.getPhone() != null) user.setPhone(req.getPhone());
         userMapper.updateById(user);
     }
 

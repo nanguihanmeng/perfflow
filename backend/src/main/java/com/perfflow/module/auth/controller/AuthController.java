@@ -4,6 +4,7 @@ import com.perfflow.common.api.Result;
 import com.perfflow.module.auth.dto.ChangePasswordReq;
 import com.perfflow.module.auth.dto.LoginReq;
 import com.perfflow.module.auth.dto.LoginResp;
+import com.perfflow.module.auth.dto.ProfileReq;
 import com.perfflow.module.auth.dto.RefreshReq;
 import com.perfflow.module.auth.service.AuthService;
 import com.perfflow.security.DataScopeContext;
@@ -46,6 +47,14 @@ public class AuthController {
     @PreAuthorize("isAuthenticated()")
     public Result<Void> changePassword(@Valid @RequestBody ChangePasswordReq req) {
         authService.changePassword(req.getNewPassword());
+        return Result.ok();
+    }
+
+    @PutMapping("/profile")
+    @Operation(summary = "修改个人资料（姓名/邮箱/电话）")
+    @PreAuthorize("isAuthenticated()")
+    public Result<Void> updateProfile(@Valid @RequestBody ProfileReq req) {
+        authService.updateProfile(req);
         return Result.ok();
     }
 

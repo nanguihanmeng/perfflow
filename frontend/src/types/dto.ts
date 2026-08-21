@@ -50,6 +50,13 @@ export interface ChangePasswordReq {
   newPassword: string
 }
 
+/** 修改个人资料 */
+export interface ProfileReq {
+  realName?: string
+  email?: string | null
+  phone?: string | null
+}
+
 /* ------------------------- 考核周期 /periods ------------------------- */
 
 export interface PeriodResp {

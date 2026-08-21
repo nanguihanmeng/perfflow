@@ -14,9 +14,9 @@ public class UserCreateReq implements Serializable {
     private String username;
     @NotBlank
     private String realName;
-    /** EMP / DEPT_LEAD / LEAD / HR / ADMIN */
+    /** EMP / DEPT_LEAD / LEAD / ADMIN（绩效考核管理员由系统专用，admin 不可创建） */
     @NotBlank
-    @Pattern(regexp = "EMP|DEPT_LEAD|LEAD|HR|ADMIN")
+    @Pattern(regexp = "EMP|DEPT_LEAD|LEAD|ADMIN")
     private String role;
     private Long deptId;
     @Email

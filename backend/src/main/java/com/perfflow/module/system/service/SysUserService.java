@@ -36,6 +36,8 @@ public class SysUserService {
     public Page<UserResp> page(String username, String role, Long deptId, Integer status,
                                int pageNo, int pageSize) {
         QueryWrapper<SysUser> qw = new QueryWrapper<>();
+        // 绩效考核管理员账号不可见（admin 不能管理）
+        qw.ne("role", RoleConst.ROLE_PERFORMANCE_HR);
         if (StringUtils.hasText(username)) qw.like("username", username);
         if (StringUtils.hasText(role)) qw.eq("role", role);
         if (deptId != null) qw.eq("dept_id", deptId);
@@ -62,15 +64,16 @@ public class SysUserService {
     }
 
     /**
-     * 参与考核的员工选项（HR 开启周期时勾选用）。
+     * 参与考核的员工选项（绩效考核管理员开启周期时勾选用）。
      *
-     * <p>排除 ADMIN，仅启用状态，含部门名。
+     * <p>排除 ADMIN 与绩效考核管理员（账号不参与考核），仅启用状态，含部门名。
      *
      * @return 员工列表
      */
     public List<UserResp> listOptions() {
         QueryWrapper<SysUser> qw = new QueryWrapper<SysUser>()
                 .ne("role", RoleConst.ROLE_ADMIN)
+                .ne("role", RoleConst.ROLE_PERFORMANCE_HR)
                 .eq("status", 1)
                 .orderByAsc("id");
         List<SysUser> users = userMapper.selectList(qw);
@@ -94,6 +97,10 @@ public class SysUserService {
         if (userMapper.selectCount(new QueryWrapper<SysUser>().eq("username", req.getUsername())) > 0) {
             throw new BizException(ResultCode.BAD_REQUEST, "用户名已存在");
         }
+        if (RoleConst.ROLE_PERFORMANCE_HR.equals(req.getRole())) {
+            throw new BizException(ResultCode.BAD_REQUEST,
+                    "绩效考核管理员账号不可由管理员创建，仅由系统维护");
+        }
         SysUser u = new SysUser();
         u.setUsername(req.getUsername());
         u.setRealName(req.getRealName());
@@ -114,6 +121,11 @@ public class SysUserService {
     public void update(Long id, UserUpdateReq req) {
         SysUser u = userMapper.selectById(id);
         if (u == null) throw new BizException(ResultCode.NOT_FOUND);
+        assertNotPerformanceHr(u, "修改");
+        if (req.getRole() != null && RoleConst.ROLE_PERFORMANCE_HR.equals(req.getRole())) {
+            throw new BizException(ResultCode.BAD_REQUEST,
+                    "绩效考核管理员角色不可由管理员设置");
+        }
         if (req.getRealName() != null) u.setRealName(req.getRealName());
         if (req.getRole() != null) u.setRole(req.getRole());
         if (req.getDeptId() != null) u.setDeptId(req.getDeptId());
@@ -124,6 +136,19 @@ public class SysUserService {
         ensureDeptLeadUnique(req.getRole() != null ? req.getRole() : u.getRole(),
                 req.getDeptId() != null ? req.getDeptId() : u.getDeptId(), id);
         userMapper.updateById(u);
+    }
+
+    /**
+     * 校验目标用户非绩效考核管理员（admin 不可管理）。
+     *
+     * @param u     目标用户
+     * @param action 操作名（用于提示）
+     */
+    private void assertNotPerformanceHr(SysUser u, String action) {
+        if (RoleConst.ROLE_PERFORMANCE_HR.equals(u.getRole())) {
+            throw new BizException(ResultCode.BAD_REQUEST,
+                    "绩效考核管理员账号不可" + action + "，仅可登录后自行修改资料");
+        }
     }
 
     /**
@@ -158,6 +183,7 @@ public class SysUserService {
         if ("admin".equals(u.getUsername())) {
             throw new BizException(ResultCode.BAD_REQUEST, "内置管理员不可删除");
         }
+        assertNotPerformanceHr(u, "删除");
         userMapper.deleteById(id);
     }
 
@@ -175,6 +201,7 @@ public class SysUserService {
     public void toggleStatus(Long id) {
         SysUser u = userMapper.selectById(id);
         if (u == null) throw new BizException(ResultCode.NOT_FOUND);
+        assertNotPerformanceHr(u, "禁用/启用");
         u.setStatus(u.getStatus() != null && u.getStatus() == 1 ? 0 : 1);
         userMapper.updateById(u);
     }

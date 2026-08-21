@@ -41,11 +41,11 @@ const canEditRows = computed(
 const canSubmit = computed(() => role.value === Role.EMP && state.value === AssessmentState.SELF_DRAFTING)
 const canApprove = computed(() => role.value === Role.DEPT_LEAD && state.value === AssessmentState.DEPT_REVIEW)
 const canLeadScore = computed(() => role.value === Role.LEAD && state.value === AssessmentState.LEAD_SCORING)
-const canPush = computed(() => role.value === Role.HR && state.value === AssessmentState.SELF_SUSPENDED)
-const canExtend = computed(() => role.value === Role.HR && state.value === AssessmentState.SELF_SUSPENDED)
-const canImport = computed(() => role.value === Role.HR && state.value === AssessmentState.SELF_DRAFTING)
+const canPush = computed(() => role.value === Role.PERFORMANCE_HR && state.value === AssessmentState.SELF_SUSPENDED)
+const canExtend = computed(() => role.value === Role.PERFORMANCE_HR && state.value === AssessmentState.SELF_SUSPENDED)
+const canImport = computed(() => role.value === Role.PERFORMANCE_HR && state.value === AssessmentState.SELF_DRAFTING)
 const canViewLogs = computed(
-  () => role.value === Role.HR || role.value === Role.LEAD || role.value === Role.DEPT_LEAD
+  () => role.value === Role.PERFORMANCE_HR || role.value === Role.LEAD || role.value === Role.DEPT_LEAD
 )
 
 const loadTable = async (): Promise<void> => {

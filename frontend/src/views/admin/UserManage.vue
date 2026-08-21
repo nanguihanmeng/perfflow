@@ -32,7 +32,10 @@ onMounted(async () => {
   deptOptions.value = res.data
 })
 
-const roleOptions = Object.values(Role)
+/** 角色下拉：排除绩效考核管理员（admin 不可创建）与 ADMIN 本身 */
+const roleOptions = Object.values(Role).filter(
+  (r) => r !== Role.PERFORMANCE_HR && r !== Role.ADMIN
+)
 
 /** 用户状态文案 */
 const statusLabel = (status: number): string => (status === UserStatus.ENABLED ? '启用' : '禁用')

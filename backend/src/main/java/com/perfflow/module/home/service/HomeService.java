@@ -47,7 +47,7 @@ public class HomeService {
             case RoleConst.ROLE_LEAD -> {
                 qw.in("state", AssessmentState.LEAD_SCORING.name());
             }
-            case RoleConst.ROLE_HR -> {
+            case RoleConst.ROLE_PERFORMANCE_HR -> {
                 qw.in("state", AssessmentState.SELF_SUSPENDED.name());
             }
             default -> { /* ADMIN 已拦截 */ }

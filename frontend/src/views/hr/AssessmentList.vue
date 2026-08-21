@@ -23,7 +23,7 @@ import PageHeader from '@/components/common/PageHeader.vue'
 const router = useRouter()
 const authStore = useAuthStore()
 
-const isHr = computed(() => authStore.role === Role.HR)
+const isHr = computed(() => authStore.role === Role.PERFORMANCE_HR)
 const periods = ref<PeriodResp[]>([])
 
 const { loading, list, pagination, query, search } = useTable<AssessmentTableResp, TablePageQuery>({
