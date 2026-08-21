@@ -10,13 +10,13 @@
 
 ### 角色与职责
 
-| 角色 | 账号示例 | 主要功能 |
-|---|---|---|
-| **ADMIN** 系统管理员 | `admin` | 用户管理、部门管理（**不参与考核**，也看不到业务数据） |
-| **HR** 人事 | `hr` | 新建/开启考核周期（勾选参与员工）、导入考核明细 Excel、推送考核表、删除考核表、导出 Excel/打印 |
-| **DEPT_LEAD** 部门负责人 | `bumen1` / `bumen2` | 部门审核：直接编辑员工自评得分、提交给领导、打回 |
-| **LEAD** 领导 | `leader` | 领导评分（0-100），生成最终结果 |
-| **EMP** 员工 | `emp01` `emp02` `emp03` `wanggong` | 填写完成率、填写岗位、提交自评、查看自己的考核表 |
+| 角色                     | 账号示例                           | 主要功能                                                                                       |
+| ------------------------ | ---------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **ADMIN** 系统管理员     | `admin`                            | 用户管理、部门管理（**不参与考核**，也看不到业务数据）                                         |
+| **HR** 人事              | `hr`                               | 新建/开启考核周期（勾选参与员工）、导入考核明细 Excel、推送考核表、删除考核表、导出 Excel/打印 |
+| **DEPT_LEAD** 部门负责人 | `bumen1` / `bumen2`                | 部门审核：直接编辑员工自评得分、提交给领导、打回                                               |
+| **LEAD** 领导            | `leader`                           | 领导评分（0-100），生成最终结果                                                                |
+| **EMP** 员工             | `emp01` `emp02` `emp03` `wanggong` | 填写完成率、填写岗位、提交自评、查看自己的考核表                                               |
 
 ### 核心业务流程
 
@@ -43,12 +43,12 @@ HR 新建周期 → 开启周期(勾选员工) → HR 导入考核明细 Excel(�
 
 ## 二、技术栈
 
-| 模块 | 选型 |
-|---|---|
-| 后端 | Spring Boot 3.3.4、Java 17、MyBatis-Plus 3.5.9、Spring Security 6、JWT (jjwt)、springdoc-openapi |
-| 前端 | Vue 3、TypeScript、Vite 6、Element Plus、Pinia、Axios |
-| 数据库 | MySQL 8.0+ |
-| Excel 导入导出 | Hutool-poi + Apache POI |
+| 模块           | 选型                                                                                             |
+| -------------- | ------------------------------------------------------------------------------------------------ |
+| 后端           | Spring Boot 3.3.4、Java 17、MyBatis-Plus 3.5.9、Spring Security 6、JWT (jjwt)、springdoc-openapi |
+| 前端           | Vue 3、TypeScript、Vite 6、Element Plus、Pinia、Axios                                            |
+| 数据库         | MySQL 8.0+                                                                                       |
+| Excel 导入导出 | Hutool-poi + Apache POI                                                                          |
 
 ---
 
@@ -91,10 +91,7 @@ perftlow/
 
 ### 1. 初始化数据库
 
-```bash
-# 在 MySQL 中执行建库脚本（会创建 perfflow 库 + 表 + 种子数据）
 mysql -u root -p < backend/sql/perfflow.sql
-```
 
 ### 2. 配置数据库连接
 
@@ -105,30 +102,22 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/perfflow?...
     username: root
-    password: 你的MySQL密码   # ← 改成实际密码
+    password: 你的MySQL密码
 ```
 
 ### 3. 启动后端
 
-```bash
-# 方式一：Windows 一键脚本
-start-backend.bat
-
-# 方式二：手动
 cd backend
 mvn -DskipTests package
 java -jar -Dspring.profiles.active=dev target/perfflow-backend.jar
-```
 
 启动后访问接口文档：http://localhost:8080/api/swagger-ui.html
 
 ### 4. 启动前端
 
-```bash
 cd frontend
 npm install
 npm run dev
-```
 
 浏览器访问：http://localhost:5173
 
@@ -136,68 +125,21 @@ npm run dev
 
 ## 五、默认账号
 
-| 角色 | 账号 | 密码 |
-|---|---|---|
-| 系统管理员 | `admin` | `12345678` |
-| 人事 | `hr` | `12345678` |
-| 领导 | `leader` | `Init@123456` |
-| 部门负责人（技术部） | `bumen1` | `Init@123456` |
-| 部门负责人（产品部） | `bumen2` | `Init@123456` |
-| 员工 | `emp01` / `emp02` / `emp03` | `Init@123456` |
-| 员工 | `wanggong` | `12345678` |
+| 角色                 | 账号                        | 密码          |
+| -------------------- | --------------------------- | ------------- |
+| 系统管理员           | `admin`                     | `12345678`    |
+| 人事                 | `hr`                        | `12345678`    |
+| 领导                 | `leader`                    | `Init@123456` |
+| 部门负责人（技术部） | `bumen1`                    | `Init@123456` |
+| 部门负责人（产品部） | `bumen2`                    | `Init@123456` |
+| 员工                 | `emp01` / `emp02` / `emp03` | `Init@123456` |
+| 员工                 | `wanggong`                  | `12345678`    |
 
 > 部分账号首次登录会提示修改密码（`mustChangePassword`），按提示设置新密码即可。
 
 ---
 
-## 六、Git：改完代码如何提交并推送
-
-项目托管在 GitHub（`origin` → `https://github.com/nanguihanmeng/perfflow`），默认分支 **main**。
-
-### 提交推送三板斧
-
-```bash
-cd E:\workspace\perftlow
-
-# 1. 查看改了什么（红色 = 已修改未暂存）
-git status
-
-# 2. 把改动加入暂存区（. 表示全部；也可 git add 指定文件）
-git add .
-
-# 3. 提交（-m 后面写本次改动的说明，方便以后回溯）
-git commit -m "feat: 新增xxx功能 / fix: 修复xxx问题"
-
-# 4. 推送到 GitHub 的 main 分支
-git push origin main
-```
-
-### 常用辅助命令
-
-| 命令 | 作用 |
-|---|---|
-| `git status` | 查看当前改动 |
-| `git diff` | 查看具体改动内容 |
-| `git add 文件名` | 只暂存某个文件 |
-| `git log --oneline` | 查看提交历史 |
-| `git pull` | 拉取远端最新代码（多人协作时推送前先 pull） |
-
-### 建议的提交信息规范
-
-- 新功能：`feat: 描述`
-- 修 bug：`fix: 描述`
-- 文档：`docs: 描述`
-- 重构：`refactor: 描述`
-
-### 注意事项
-
-- **构建产物不会被推送**：`backend/target`、`frontend/node_modules`、`frontend/dist`、`logs/` 已在 `.gitignore` 中忽略，无需手动处理
-- **推送前确认在 main 分支**：`git branch` 应显示 `* main`；若不在，先 `git checkout main`
-- 第一次推送若提示需要登录 GitHub，会弹出浏览器授权，按提示完成即可
-
----
-
-## 七、常见问题
+## 六、常见问题
 
 **Q：管理员能看考核业务吗？**
 A：不能。ADMIN 访问 `/api/assessment-tables`、`/api/periods`、`/api/home` 会被拦截返回 403。
