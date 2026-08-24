@@ -28,8 +28,7 @@ const items = computed(() => [
   { label: '登录名', value: user.value?.username ?? EMPTY_PLACEHOLDER },
   { label: '角色', value: roleLabel.value },
   { label: '部门', value: user.value?.deptName ?? EMPTY_PLACEHOLDER },
-  { label: '部门负责人', value: user.value?.deptLead ? '是' : '否' },
-  { label: '令牌有效期(秒)', value: user.value?.expiresIn != null ? String(user.value.expiresIn) : EMPTY_PLACEHOLDER }
+  { label: '部门负责人', value: user.value?.deptLead ? '是' : '否' }
 ])
 
 /* ---------------- 修改资料 ---------------- */

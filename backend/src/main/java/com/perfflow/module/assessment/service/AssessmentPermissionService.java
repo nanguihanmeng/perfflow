@@ -52,6 +52,19 @@ public class AssessmentPermissionService {
         if (role == null) {
             throw new BizException(ResultCode.UNAUTHORIZED);
         }
+        // 自评挂起(待人事推送)阶段：仅 HR 与本人(EMP) 可看，部门领导/领导不可看
+        if (AssessmentState.SELF_SUSPENDED.name().equals(t.getState())) {
+            if (RoleConst.ROLE_PERFORMANCE_HR.equals(role)) {
+                return;
+            }
+            if (RoleConst.ROLE_EMP.equals(role)) {
+                Long uid = DataScopeContext.currentUserId();
+                if (uid != null && uid.equals(t.getUserId())) {
+                    return;
+                }
+            }
+            throw new BizException(ResultCode.FORBIDDEN);
+        }
         switch (role) {
             case RoleConst.ROLE_LEAD, RoleConst.ROLE_PERFORMANCE_HR -> { /* all */ }
             case RoleConst.ROLE_DEPT_LEAD -> {
@@ -70,23 +83,22 @@ public class AssessmentPermissionService {
         }
     }
 
-    /** 当前用户能否改某行（员工填完成率；部门领导在审核阶段改完成率） */
+    /** 当前用户能否改某行（员工填完成率；部门领导在审核阶段改自评得分；加减分项均不可编辑） */
     public boolean canEditRow(AssessmentTable t, AssessmentRow r) {
         String role = currentRole();
         if (role == null) return false;
         AssessmentState cur = AssessmentState.valueOf(t.getState());
+        boolean isPlanOrOpen = r.getCategory() != null && !"BONUS".equals(r.getCategory());
         return switch (role) {
             case RoleConst.ROLE_EMP -> {
                 boolean isMine = DataScopeContext.currentUserId() != null
                         && DataScopeContext.currentUserId().equals(t.getUserId());
-                boolean isPlanOrOpen = r.getCategory() != null
-                        && !"BONUS".equals(r.getCategory());
                 yield isMine && cur == AssessmentState.SELF_DRAFTING && isPlanOrOpen;
             }
             case RoleConst.ROLE_DEPT_LEAD -> {
                 boolean sameDept = DataScopeContext.currentDeptId() != null
                         && DataScopeContext.currentDeptId().equals(t.getDeptId());
-                yield sameDept && cur == AssessmentState.DEPT_REVIEW;
+                yield sameDept && cur == AssessmentState.DEPT_REVIEW && isPlanOrOpen;
             }
             default -> false;
         };
@@ -121,10 +133,17 @@ public class AssessmentPermissionService {
             return qw;
         }
         switch (role) {
-            case RoleConst.ROLE_LEAD, RoleConst.ROLE_PERFORMANCE_HR -> { return qw; }
+            case RoleConst.ROLE_LEAD -> {
+                // 自评挂起(待人事推送)阶段对领导不可见
+                qw.ne("state", AssessmentState.SELF_SUSPENDED.name());
+                return qw;
+            }
+            case RoleConst.ROLE_PERFORMANCE_HR -> { return qw; }
             case RoleConst.ROLE_DEPT_LEAD -> {
                 Long deptId = DataScopeContext.currentDeptId();
                 if (deptId != null) qw.eq("dept_id", deptId);
+                // 自评挂起(待人事推送)阶段对部门领导不可见
+                qw.ne("state", AssessmentState.SELF_SUSPENDED.name());
                 return qw;
             }
             case RoleConst.ROLE_EMP -> {

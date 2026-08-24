@@ -30,3 +30,14 @@ export const RowCategoryLabel: Record<string, string> = {
   OPEN: '开放型指标',
   BONUS: '加减分项'
 }
+
+/** 流程动作中文名映射 */
+export const ActionLabel: Record<string, string> = {
+  SUBMIT: '提交自评',
+  PUSH: '推送到部门审核',
+  APPROVE: '提交给领导评分',
+  REJECT: '打回重填',
+  LEAD_SCORE: '领导评分',
+  EXTEND_SUSPEND: '延长挂起',
+  CREATE: '创建考核表'
+}

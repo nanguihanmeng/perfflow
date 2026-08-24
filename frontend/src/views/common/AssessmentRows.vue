@@ -10,12 +10,12 @@
  */
 import { computed, reactive, ref } from 'vue'
 import type { RowResp } from '@/types/dto'
+import { RowCategory, Role } from '@/types/enums'
 import { RowCategoryLabel } from '@/types/role'
 import { updateRowApi } from '@/api/assessment.api'
 import { isCompletionRateValid, isScoreInRange } from '@/utils/validate'
 import { toastError, toastSuccess } from '@/utils/message'
 import { useAuthStore } from '@/store/auth'
-import { Role } from '@/types/enums'
 import ScoreDisplay from '@/components/common/ScoreDisplay.vue'
 
 interface Props {
@@ -159,21 +159,24 @@ const spanMethod = ({ row, columnIndex }: { row: RowResp; columnIndex: number })
       </el-table-column>
       <el-table-column v-if="editable" label="操作" width="90" align="center" fixed="right">
         <template #default="{ row }">
-          <el-button
-            v-if="editingRowId !== row.id"
-            link
-            type="primary"
-            size="small"
-            @click="startEdit(row as RowResp)"
-          >
-            编辑
-          </el-button>
-          <template v-else>
-            <el-button link type="success" size="small" :loading="savingRowId === row.id" @click="saveRow(row as RowResp)">
-              保存
+          <template v-if="row.category !== RowCategory.BONUS">
+            <el-button
+              v-if="editingRowId !== row.id"
+              link
+              type="primary"
+              size="small"
+              @click="startEdit(row as RowResp)"
+            >
+              编辑
             </el-button>
-            <el-button link size="small" @click="cancelEdit">取消</el-button>
+            <template v-else>
+              <el-button link type="success" size="small" :loading="savingRowId === row.id" @click="saveRow(row as RowResp)">
+                保存
+              </el-button>
+              <el-button link size="small" @click="cancelEdit">取消</el-button>
+            </template>
           </template>
+          <span v-else class="text-disabled">—</span>
         </template>
       </el-table-column>
     </el-table>

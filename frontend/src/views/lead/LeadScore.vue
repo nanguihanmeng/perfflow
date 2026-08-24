@@ -11,6 +11,7 @@ import { formatDateTime } from '@/utils/format'
 import StateTag from '@/components/common/StateTag.vue'
 import ScoreDisplay from '@/components/common/ScoreDisplay.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import { StateLabel } from '@/types/role'
 
 const router = useRouter()
 
@@ -19,7 +20,7 @@ const { loading, list, pagination, query, search } = useTable<AssessmentTableRes
   defaultQuery: () => ({ state: AssessmentState.LEAD_SCORING })
 })
 
-const stateOptions = Object.values(AssessmentState)
+const stateOptions = Object.values(AssessmentState).map((s) => ({ value: s, label: StateLabel[s] ?? s }))
 
 const goDetail = (row: AssessmentTableResp): void => {
   router.push(`/lead/score/${row.id}`)
@@ -39,7 +40,7 @@ const goDetail = (row: AssessmentTableResp): void => {
           style="width: 180px"
           @change="search"
         >
-          <el-option v-for="s in stateOptions" :key="s" :label="s" :value="s" />
+          <el-option v-for="s in stateOptions" :key="s.value" :label="s.label" :value="s.value" />
         </el-select>
       </div>
 

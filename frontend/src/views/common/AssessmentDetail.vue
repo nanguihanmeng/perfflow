@@ -15,6 +15,7 @@ import { useAuthStore } from '@/store/auth'
 import { confirmAction, toastError, toastSuccess } from '@/utils/message'
 import { formatDateTime } from '@/utils/format'
 import { isNotBlank, isScoreInRange } from '@/utils/validate'
+import { ActionLabel, RoleLabel, StateLabel } from '@/types/role'
 import AssessmentRows from '@/views/common/AssessmentRows.vue'
 import StateTag from '@/components/common/StateTag.vue'
 import ScoreDisplay from '@/components/common/ScoreDisplay.vue'
@@ -275,9 +276,9 @@ const goBack = (): void => {
             placement="top"
           >
             <div class="detail-logs__item">
-              <span class="detail-logs__action">{{ log.action || '状态变更' }}</span>
-              <span class="detail-logs__states">{{ log.fromState }} → {{ log.toState }}</span>
-              <span class="detail-logs__operator">{{ log.operatorName }}（{{ log.operatorRole }}）</span>
+              <span class="detail-logs__action">{{ ActionLabel[log.action] || '状态变更' }}</span>
+              <span class="detail-logs__states">{{ StateLabel[log.fromState] || log.fromState }} → {{ StateLabel[log.toState] || log.toState }}</span>
+              <span class="detail-logs__operator">{{ log.operatorName }}（{{ (RoleLabel as Record<string, string>)[log.operatorRole] || log.operatorRole }}）</span>
             </div>
             <div v-if="log.comment" class="detail-logs__comment">{{ log.comment }}</div>
           </el-timeline-item>

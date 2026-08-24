@@ -19,6 +19,7 @@ import StateTag from '@/components/common/StateTag.vue'
 import ScoreDisplay from '@/components/common/ScoreDisplay.vue'
 import GradeBadge from '@/components/common/GradeBadge.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import { StateLabel } from '@/types/role'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -31,7 +32,7 @@ const { loading, list, pagination, query, search } = useTable<AssessmentTableRes
   defaultQuery: () => ({ periodId: undefined, state: undefined })
 })
 
-const stateOptions = Object.values(AssessmentState)
+const stateOptions = Object.values(AssessmentState).map((s) => ({ value: s, label: StateLabel[s] ?? s }))
 
 onMounted(async () => {
   const res = await getPeriodListApi()
@@ -109,7 +110,7 @@ const handlePrint = async (): Promise<void> => {
           style="width: 180px"
           @change="search"
         >
-          <el-option v-for="s in stateOptions" :key="s" :label="s" :value="s" />
+          <el-option v-for="s in stateOptions" :key="s.value" :label="s.label" :value="s.value" />
         </el-select>
       </div>
 

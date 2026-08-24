@@ -36,10 +36,10 @@ public class AssessmentCalcService {
     /**
      * 重算整张主表的自评总分并写入。
      *
-     * <p>规则：只对已存在的 self_score 求和（BONUS 行不计入），
-     * 不重算 self_score —— self_score 由调用方按场景决定：
+     * <p>规则：对所有已有 self_score 的行求和（含 BONUS 加减分项）。
+     * self_score 由调用方按场景决定：
      * <ul>
-     *   <li>员工改完成率：先按「指标分数 × 完成率%」重算各非 BONUS 行 self_score，再求和</li>
+     *   <li>员工改完成率：先按「指标分数 × 完成率%」重算 PLAN/OPEN 行，BONUS 行取指标分数，再求和</li>
      *   <li>部门领导改自评得分：直接覆盖 self_score，再求和</li>
      * </ul>
      */
@@ -52,10 +52,6 @@ public class AssessmentCalcService {
 
         BigDecimal total = BigDecimal.ZERO;
         for (AssessmentRow r : rows) {
-            if (RowCategory.BONUS.name().equals(r.getCategory())) {
-                // BONUS 行不计入自评总分
-                continue;
-            }
             if (r.getSelfScore() != null) {
                 total = total.add(r.getSelfScore());
             }
@@ -66,7 +62,9 @@ public class AssessmentCalcService {
     }
 
     /**
-     * 按完成率重算表中所有非 BONUS 行的 self_score，并重算总分。
+     * 按完成率重算表中各行 self_score，并重算总分。
+     *
+     * <p>PLAN/OPEN 行 = 指标分数 × 完成率%；BONUS 加减分项 = 指标分数（公司定的加减分，直接计入）。
      *
      * <p>用于员工填写完成率/提交时。
      */
@@ -78,7 +76,8 @@ public class AssessmentCalcService {
                         .orderByAsc("seq"));
         for (AssessmentRow r : rows) {
             if (RowCategory.BONUS.name().equals(r.getCategory())) {
-                r.setSelfScore(null);
+                // 加减分项：得分 = 指标分数（加减分清单由公司/HR 确定，不乘完成率）
+                r.setSelfScore(r.getBaseScore() == null ? BigDecimal.ZERO : r.getBaseScore());
             } else {
                 r.setSelfScore(calcSelfScore(r.getBaseScore(), r.getCompletionRate()));
             }
