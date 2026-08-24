@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 部门审核（DEPT_LEAD）：本部门考核表列表，默认筛选部门审核中
+ * 部门审核（DEPT_LEAD）：本部门「部门审核中」的考核表，仅此环节可见
  */
 import { useRouter } from 'vue-router'
 import { useTable } from '@/composables/useTable'
@@ -12,16 +12,13 @@ import StateTag from '@/components/common/StateTag.vue'
 import ScoreDisplay from '@/components/common/ScoreDisplay.vue'
 import GradeBadge from '@/components/common/GradeBadge.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
-import { StateLabel } from '@/types/role'
 
 const router = useRouter()
 
-const { loading, list, pagination, query, search } = useTable<AssessmentTableResp, TablePageQuery>({
+const { loading, list, pagination } = useTable<AssessmentTableResp, TablePageQuery>({
   fetcher: (q) => getTablePageApi(q).then((res) => res.data),
   defaultQuery: () => ({ state: AssessmentState.DEPT_REVIEW })
 })
-
-const stateOptions = Object.values(AssessmentState).map((s) => ({ value: s, label: StateLabel[s] ?? s }))
 
 const goDetail = (row: AssessmentTableResp): void => {
   router.push(`/dept/review/${row.id}`)
@@ -30,21 +27,9 @@ const goDetail = (row: AssessmentTableResp): void => {
 
 <template>
   <div class="dept-review page-container">
-    <PageHeader title="部门审核" description="审核本部门员工的考核表，可调分、通过或打回" />
+    <PageHeader title="部门审核" description="审核本部门员工的考核表，可改自评得分、提交给领导或打回" />
 
     <div class="card">
-      <div class="filter-bar">
-        <el-select
-          v-model="query.state"
-          placeholder="全部状态"
-          clearable
-          style="width: 180px"
-          @change="search"
-        >
-          <el-option v-for="s in stateOptions" :key="s.value" :label="s.label" :value="s.value" />
-        </el-select>
-      </div>
-
       <el-table v-loading="loading" :data="list" border stripe>
         <el-table-column prop="periodName" label="考核周期" min-width="160" />
         <el-table-column prop="realName" label="员工" width="120" />
@@ -93,12 +78,6 @@ const goDetail = (row: AssessmentTableResp): void => {
 
 <style scoped lang="scss">
 @use '@/styles/variables.scss' as *;
-
-.filter-bar {
-  display: flex;
-  gap: $space-12;
-  margin-bottom: $space-16;
-}
 
 .pagination-bar {
   display: flex;

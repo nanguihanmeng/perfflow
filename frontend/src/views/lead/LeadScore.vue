@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 领导评分（LEAD）：全部进入领导评分状态的考核表
+ * 领导评分（LEAD）：全部「领导评分中」的考核表，仅此环节可见
  */
 import { useRouter } from 'vue-router'
 import { useTable } from '@/composables/useTable'
@@ -11,16 +11,13 @@ import { formatDateTime } from '@/utils/format'
 import StateTag from '@/components/common/StateTag.vue'
 import ScoreDisplay from '@/components/common/ScoreDisplay.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
-import { StateLabel } from '@/types/role'
 
 const router = useRouter()
 
-const { loading, list, pagination, query, search } = useTable<AssessmentTableResp, TablePageQuery>({
+const { loading, list, pagination } = useTable<AssessmentTableResp, TablePageQuery>({
   fetcher: (q) => getTablePageApi(q).then((res) => res.data),
   defaultQuery: () => ({ state: AssessmentState.LEAD_SCORING })
 })
-
-const stateOptions = Object.values(AssessmentState).map((s) => ({ value: s, label: StateLabel[s] ?? s }))
 
 const goDetail = (row: AssessmentTableResp): void => {
   router.push(`/lead/score/${row.id}`)
@@ -32,18 +29,6 @@ const goDetail = (row: AssessmentTableResp): void => {
     <PageHeader title="领导评分" description="对进入评分阶段的考核表进行评分" />
 
     <div class="card">
-      <div class="filter-bar">
-        <el-select
-          v-model="query.state"
-          placeholder="全部状态"
-          clearable
-          style="width: 180px"
-          @change="search"
-        >
-          <el-option v-for="s in stateOptions" :key="s.value" :label="s.label" :value="s.value" />
-        </el-select>
-      </div>
-
       <el-table v-loading="loading" :data="list" border stripe>
         <el-table-column prop="periodName" label="考核周期" min-width="160" />
         <el-table-column prop="realName" label="员工" width="120" />
@@ -90,12 +75,6 @@ const goDetail = (row: AssessmentTableResp): void => {
 
 <style scoped lang="scss">
 @use '@/styles/variables.scss' as *;
-
-.filter-bar {
-  display: flex;
-  gap: $space-12;
-  margin-bottom: $space-16;
-}
 
 .pagination-bar {
   display: flex;
