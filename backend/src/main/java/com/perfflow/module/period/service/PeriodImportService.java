@@ -92,6 +92,8 @@ public class PeriodImportService {
             if (userIds.isEmpty()) {
                 throw new BizException(ResultCode.BAD_REQUEST, "Excel 中未解析到任何员工考核明细");
             }
+            log.info("周期导入考核明细: periodId={}, 员工数={}, userIds={}",
+                    period.getId(), userIds.size(), userIds);
         } catch (BizException e) {
             throw e;
         } catch (Exception e) {

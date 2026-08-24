@@ -14,6 +14,7 @@ import com.perfflow.security.JwtUtil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -69,10 +71,13 @@ public class AuthService {
                 SysDepartment d = deptMapper.selectById(u.getDeptId());
                 if (d != null) resp.setDeptName(d.getName());
             }
+            log.info("登录成功: userId={}, username={}, role={}", u.getId(), u.getUsername(), u.getRole());
             return resp;
         } catch (BadCredentialsException e) {
+            log.warn("登录失败（密码错误）: username={}", req.getUsername());
             throw new BizException(ResultCode.LOGIN_INVALID);
         } catch (DisabledException e) {
+            log.warn("登录失败（账号禁用）: username={}", req.getUsername());
             throw new BizException(ResultCode.ACCOUNT_DISABLED);
         }
     }
@@ -95,6 +100,7 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setMustChangePassword(false);
         userMapper.updateById(user);
+        log.info("修改密码成功: userId={}", userId);
     }
 
     /**
@@ -118,6 +124,7 @@ public class AuthService {
         if (req.getEmail() != null) user.setEmail(req.getEmail());
         if (req.getPhone() != null) user.setPhone(req.getPhone());
         userMapper.updateById(user);
+        log.info("修改个人资料: userId={}", userId);
     }
 
     public LoginResp refresh(String refreshToken) {

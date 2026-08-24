@@ -170,14 +170,25 @@ public class AssessmentTableService {
                         "第 " + r.getSeq() + " 行完成率需在 0-100 之间");
             }
         }
-        stateMachine.transition(t, AssessmentState.SELF_SUSPENDED);
+        // 先重算分数，再流转状态，避免状态已变但分数未落地的中间态
+        calcService.recalcByCompletionRate(t);
+        // 原子条件更新：仅当仍处于 SELF_DRAFTING 才流转，防并发重复提交
+        int updated = tableMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<AssessmentTable>()
+                .eq(AssessmentTable::getId, tableId)
+                .eq(AssessmentTable::getState, AssessmentState.SELF_DRAFTING.name())
+                .set(AssessmentTable::getState, AssessmentState.SELF_SUSPENDED.name())
+                .set(AssessmentTable::getSubmittedAt, LocalDateTime.now()));
+        if (updated == 0) {
+            throw new BizException(ResultCode.STATE_NOT_ALLOWED, "考核表状态已变化，请刷新后重试");
+        }
+        t.setState(AssessmentState.SELF_SUSPENDED.name());
         t.setSubmittedAt(LocalDateTime.now());
         for (AssessmentRow r : rows) {
             r.setFrozen(true);
             rowMapper.updateById(r);
         }
-        calcService.recalcByCompletionRate(t);
         flowService.writeLog(t, AssessmentState.SELF_DRAFTING, AssessmentState.SELF_SUSPENDED, "SUBMIT");
+        log.info("员工提交考核表: tableId={}, userId={}", tableId, t.getUserId());
     }
 
     @Transactional
@@ -187,10 +198,19 @@ public class AssessmentTableService {
             throw new BizException(ResultCode.FORBIDDEN);
         }
         stateMachine.assertInState(t, AssessmentState.SELF_SUSPENDED);
-        stateMachine.transition(t, AssessmentState.DEPT_REVIEW);
+        // 原子条件更新：仅当仍处于 SELF_SUSPENDED 才流转，防并发重复推送
+        int updated = tableMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<AssessmentTable>()
+                .eq(AssessmentTable::getId, tableId)
+                .eq(AssessmentTable::getState, AssessmentState.SELF_SUSPENDED.name())
+                .set(AssessmentTable::getState, AssessmentState.DEPT_REVIEW.name())
+                .set(AssessmentTable::getPushedAt, LocalDateTime.now()));
+        if (updated == 0) {
+            throw new BizException(ResultCode.STATE_NOT_ALLOWED, "考核表状态已变化，请刷新后重试");
+        }
+        t.setState(AssessmentState.DEPT_REVIEW.name());
         t.setPushedAt(LocalDateTime.now());
-        tableMapper.updateById(t);
         flowService.writeLog(t, AssessmentState.SELF_SUSPENDED, AssessmentState.DEPT_REVIEW, "PUSH");
+        log.info("人事推送考核表: tableId={}", tableId);
     }
 
     @Transactional
@@ -200,10 +220,19 @@ public class AssessmentTableService {
             throw new BizException(ResultCode.FORBIDDEN);
         }
         stateMachine.assertInState(t, AssessmentState.DEPT_REVIEW);
-        stateMachine.transition(t, AssessmentState.LEAD_SCORING);
+        // 原子条件更新：仅当仍处于 DEPT_REVIEW 才流转，防并发重复提交
+        int updated = tableMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<AssessmentTable>()
+                .eq(AssessmentTable::getId, tableId)
+                .eq(AssessmentTable::getState, AssessmentState.DEPT_REVIEW.name())
+                .set(AssessmentTable::getState, AssessmentState.LEAD_SCORING.name())
+                .set(AssessmentTable::getDeptApprovedAt, LocalDateTime.now()));
+        if (updated == 0) {
+            throw new BizException(ResultCode.STATE_NOT_ALLOWED, "考核表状态已变化，请刷新后重试");
+        }
+        t.setState(AssessmentState.LEAD_SCORING.name());
         t.setDeptApprovedAt(LocalDateTime.now());
-        tableMapper.updateById(t);
         flowService.writeLog(t, AssessmentState.DEPT_REVIEW, AssessmentState.LEAD_SCORING, "APPROVE", comment);
+        log.info("部门负责人提交考核表给领导: tableId={}, deptId={}", tableId, t.getDeptId());
     }
 
     @Transactional
@@ -216,7 +245,15 @@ public class AssessmentTableService {
             throw new BizException(ResultCode.FORBIDDEN);
         }
         stateMachine.assertInState(t, AssessmentState.DEPT_REVIEW);
-        stateMachine.transition(t, AssessmentState.SELF_DRAFTING);
+        // 原子条件更新：仅当仍处于 DEPT_REVIEW 才流转
+        int updated = tableMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<AssessmentTable>()
+                .eq(AssessmentTable::getId, tableId)
+                .eq(AssessmentTable::getState, AssessmentState.DEPT_REVIEW.name())
+                .set(AssessmentTable::getState, AssessmentState.SELF_DRAFTING.name()));
+        if (updated == 0) {
+            throw new BizException(ResultCode.STATE_NOT_ALLOWED, "考核表状态已变化，请刷新后重试");
+        }
+        t.setState(AssessmentState.SELF_DRAFTING.name());
         // 解冻行
         List<AssessmentRow> rows = rowMapper.selectList(
                 new QueryWrapper<AssessmentRow>().eq("table_id", t.getId()));
@@ -224,8 +261,8 @@ public class AssessmentTableService {
             r.setFrozen(false);
             rowMapper.updateById(r);
         }
-        tableMapper.updateById(t);
         flowService.writeLog(t, AssessmentState.DEPT_REVIEW, AssessmentState.SELF_DRAFTING, "REJECT", comment);
+        log.info("部门负责人打回考核表: tableId={}, comment={}", tableId, comment);
     }
 
     @Transactional
@@ -241,10 +278,20 @@ public class AssessmentTableService {
             throw new BizException(ResultCode.FORBIDDEN);
         }
         stateMachine.assertInState(t, AssessmentState.LEAD_SCORING);
-        stateMachine.transition(t, AssessmentState.FINISHED);
+        // 原子条件更新：仅当仍处于 LEAD_SCORING 才流转
+        int updated = tableMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<AssessmentTable>()
+                .eq(AssessmentTable::getId, tableId)
+                .eq(AssessmentTable::getState, AssessmentState.LEAD_SCORING.name())
+                .set(AssessmentTable::getState, AssessmentState.FINISHED.name())
+                .set(AssessmentTable::getLeadFinishedAt, LocalDateTime.now()));
+        if (updated == 0) {
+            throw new BizException(ResultCode.STATE_NOT_ALLOWED, "考核表状态已变化，请刷新后重试");
+        }
+        t.setState(AssessmentState.FINISHED.name());
         t.setLeadFinishedAt(LocalDateTime.now());
         calcService.finalizeWithLeaderScore(t, leaderScore);
         flowService.writeLog(t, AssessmentState.LEAD_SCORING, AssessmentState.FINISHED, "LEAD_SCORE", comment);
+        log.info("领导评分完成: tableId={}, score={}", tableId, leaderScore);
     }
 
     @Transactional
@@ -254,6 +301,10 @@ public class AssessmentTableService {
         if (!RoleConst.ROLE_PERFORMANCE_HR.equals(role) && !RoleConst.ROLE_ADMIN.equals(role)) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
+        if (days <= 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "延长天数必须为正数");
+        }
+        String safeReason = StringUtils.hasText(reason) ? reason.trim() : "未填写原因";
         int next = (t.getSuspendExtendedDays() == null ? 0 : t.getSuspendExtendedDays()) + days;
         if (next > 30) {
             throw new BizException(ResultCode.EXTEND_OVER_LIMIT);
@@ -261,7 +312,8 @@ public class AssessmentTableService {
         t.setSuspendExtendedDays(next);
         tableMapper.updateById(t);
         flowService.writeLog(t, AssessmentState.valueOf(t.getState()), AssessmentState.valueOf(t.getState()),
-                "EXTEND_SUSPEND", "延长 " + days + " 天: " + reason);
+                "EXTEND_SUSPEND", "延长 " + days + " 天: " + safeReason);
+        log.info("延长挂起: tableId={}, days={}, 累计={}", tableId, days, next);
     }
 
     // ==================== 模板初始化 ====================

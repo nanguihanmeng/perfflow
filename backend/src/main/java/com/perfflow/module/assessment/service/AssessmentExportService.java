@@ -3,6 +3,8 @@ package com.perfflow.module.assessment.service;
 import cn.hutool.poi.excel.ExcelUtil;
 import cn.hutool.poi.excel.ExcelWriter;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.perfflow.common.api.ResultCode;
+import com.perfflow.common.exception.BizException;
 import com.perfflow.module.assessment.dto.AssessmentTableResp;
 import com.perfflow.module.assessment.dto.RowResp;
 import com.perfflow.module.assessment.entity.AssessmentRow;
@@ -19,7 +21,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 考核结果导出（仅 HR）。
@@ -47,32 +51,48 @@ public class AssessmentExportService {
                         .eq(periodId != null, "period_id", periodId)
                         .orderByAsc("dept_id").orderByAsc("user_id"));
 
+        // 批量加载用户/部门缓存，避免 N+1
+        Map<Long, String> userCache = new HashMap<>();
+        Map<Long, String> deptCache = new HashMap<>();
+        Map<Long, String> deptLeadCache = new HashMap<>();
+        for (AssessmentTable t : tables) {
+            if (t.getUserId() != null && !userCache.containsKey(t.getUserId())) {
+                SysUser u = userMapper.selectById(t.getUserId());
+                userCache.put(t.getUserId(), u == null ? "" : u.getRealName());
+            }
+            if (t.getDeptId() != null && !deptCache.containsKey(t.getDeptId())) {
+                SysDepartment d = deptMapper.selectById(t.getDeptId());
+                deptCache.put(t.getDeptId(), d == null ? "" : d.getName());
+                SysUser lead = userMapper.selectOne(new QueryWrapper<SysUser>()
+                        .eq("dept_id", t.getDeptId()).eq("role", "DEPT_LEAD")
+                        .eq("status", 1).last("LIMIT 1"));
+                deptLeadCache.put(t.getDeptId(), lead == null ? "" : lead.getRealName());
+            }
+        }
+
         try (ExcelWriter writer = ExcelUtil.getWriter();
              ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             int idx = 0;
             for (AssessmentTable t : tables) {
-                writeTable(writer, t, period, idx);
+                writeTable(writer, t, period, idx, userCache, deptCache, deptLeadCache);
                 idx += 20; // 每表占 16 行 + 4 空行
             }
             writer.flush(baos);
             return baos.toByteArray();
+        } catch (BizException e) {
+            throw e;
         } catch (Exception e) {
-            throw new RuntimeException("导出失败: " + e.getMessage(), e);
+            throw new BizException(ResultCode.INTERNAL_ERROR, "导出失败: " + e.getMessage());
         }
     }
 
     /** 单表按模板 A1:G16 布局写入（标题/信息栏/表头/10行/总分/签字栏） */
-    private void writeTable(ExcelWriter writer, AssessmentTable t, AssessmentPeriod period, int startRow) {
-        SysUser u = userMapper.selectById(t.getUserId());
-        SysDepartment d = deptMapper.selectById(t.getDeptId());
-        SysUser deptLead = t.getDeptId() == null ? null
-                : userMapper.selectOne(new QueryWrapper<SysUser>()
-                        .eq("dept_id", t.getDeptId()).eq("role", "DEPT_LEAD")
-                        .eq("status", 1).last("LIMIT 1"));
-
-        String realName = u == null ? "" : u.getRealName();
-        String deptName = d == null ? "" : d.getName();
-        String deptLeadName = deptLead == null ? "" : deptLead.getRealName();
+    private void writeTable(ExcelWriter writer, AssessmentTable t, AssessmentPeriod period, int startRow,
+                            Map<Long, String> userCache, Map<Long, String> deptCache,
+                            Map<Long, String> deptLeadCache) {
+        String realName = userCache.getOrDefault(t.getUserId(), "");
+        String deptName = deptCache.getOrDefault(t.getDeptId(), "");
+        String deptLeadName = deptLeadCache.getOrDefault(t.getDeptId(), "");
         String position = t.getPosition() == null ? "" : t.getPosition();
         String periodText = period == null ? "" : period.getName();
 

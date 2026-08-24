@@ -36,6 +36,8 @@ public class AssessmentImportService {
     /** 数据起始行（表头在第 4 行，数据从第 5 行开始） */
     private static final int DATA_START_ROW = 4;
     private static final int DATA_ROW_COUNT = 10;
+    /** 导入文件大小上限 5MB */
+    private static final long MAX_FILE_SIZE = 5 * 1024 * 1024;
 
     /**
      * 导入考核明细到指定主表。
@@ -45,6 +47,12 @@ public class AssessmentImportService {
      */
     @Transactional
     public void importRows(Long tableId, byte[] bytes) {
+        if (bytes == null || bytes.length == 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "导入文件为空");
+        }
+        if (bytes.length > MAX_FILE_SIZE) {
+            throw new BizException(ResultCode.BAD_REQUEST, "导入文件过大（上限 5MB）");
+        }
         AssessmentTable t = tableService.getRequired(tableId);
         if (!"SELF_DRAFTING".equals(t.getState())) {
             throw new BizException(ResultCode.STATE_NOT_ALLOWED, "仅自评中状态可导入考核明细");

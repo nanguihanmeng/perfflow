@@ -6,10 +6,13 @@ import com.perfflow.common.exception.BizException;
 import com.perfflow.module.system.dto.DeptReq;
 import com.perfflow.module.system.dto.DeptResp;
 import com.perfflow.module.system.entity.SysDepartment;
+import com.perfflow.module.system.entity.SysUser;
 import com.perfflow.module.system.mapper.SysDepartmentMapper;
+import com.perfflow.module.system.mapper.SysUserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,6 +22,7 @@ import java.util.List;
 public class SysDeptService {
 
     private final SysDepartmentMapper deptMapper;
+    private final SysUserMapper userMapper;
 
     public List<DeptResp> list() {
         List<SysDepartment> all = deptMapper.selectList(
@@ -47,7 +51,15 @@ public class SysDeptService {
     public void update(Long id, DeptReq req) {
         SysDepartment d = deptMapper.selectById(id);
         if (d == null) throw new BizException(ResultCode.NOT_FOUND);
-        if (req.getName() != null) d.setName(req.getName());
+        // 修改名称时校验重名（排除自身）
+        if (StringUtils.hasText(req.getName())) {
+            Long dup = deptMapper.selectCount(new QueryWrapper<SysDepartment>()
+                    .eq("name", req.getName()).ne("id", id));
+            if (dup != null && dup > 0) {
+                throw new BizException(ResultCode.BAD_REQUEST, "部门名已存在");
+            }
+            d.setName(req.getName());
+        }
         if (req.getParentId() != null) d.setParentId(req.getParentId());
         if (req.getLeaderUserId() != null) d.setLeaderUserId(req.getLeaderUserId());
         if (req.getSort() != null) d.setSort(req.getSort());
@@ -59,9 +71,13 @@ public class SysDeptService {
     public void delete(Long id) {
         SysDepartment d = deptMapper.selectById(id);
         if (d == null) throw new BizException(ResultCode.NOT_FOUND);
-        // 校验是否还有人
+        // 校验是否还有子部门
         if (deptMapper.selectCount(new QueryWrapper<SysDepartment>().eq("parent_id", id)) > 0) {
             throw new BizException(ResultCode.BAD_REQUEST, "存在子部门，不可删除");
+        }
+        // 校验部门下是否还有用户
+        if (userMapper.selectCount(new QueryWrapper<SysUser>().eq("dept_id", id)) > 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "该部门下仍有用户，不可删除");
         }
         deptMapper.deleteById(id);
     }

@@ -11,6 +11,7 @@ import com.perfflow.module.assessment.enums.RowCategory;
 import com.perfflow.module.assessment.mapper.AssessmentRowMapper;
 import com.perfflow.security.DataScopeContext;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +23,7 @@ import java.math.BigDecimal;
  * <p>自评得分由后端按「指标分数 × 完成率%」自动计算，任何人不可直接写得分；
  * 行结果（考核结果）只与总分相关，行级不落库。
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AssessmentRowService {
@@ -81,6 +83,7 @@ public class AssessmentRowService {
             r.setSelfScore(req.getSelfScore());
             rowMapper.updateById(r);
             calcService.recalc(t);
+            log.info("部门负责人改自评得分: tableId={}, rowId={}, score={}", tableId, rowId, req.getSelfScore());
         } else {
             throw new BizException(ResultCode.FORBIDDEN);
         }

@@ -45,6 +45,9 @@ public class AssessmentCalcService {
      */
     @Transactional
     public AssessmentTable recalc(AssessmentTable table) {
+        if (table == null || table.getId() == null) {
+            throw new IllegalArgumentException("table 不能为空");
+        }
         List<AssessmentRow> rows = rowMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<AssessmentRow>()
                         .eq("table_id", table.getId())

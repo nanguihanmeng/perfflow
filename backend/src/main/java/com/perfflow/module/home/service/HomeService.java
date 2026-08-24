@@ -24,6 +24,8 @@ public class HomeService {
     private final AssessmentTableMapper tableMapper;
     private final AssessmentPeriodMapper periodMapper;
 
+    private static final String TYPE_SUSPEND_SOON = "SUSPEND_SOON";
+
     public RemindersResp load() {
         RemindersResp out = new RemindersResp();
         String role = DataScopeContext.current().getPrimaryRole();
@@ -60,7 +62,7 @@ public class HomeService {
             r.setTitle(stateText(t.getState()) + " #" + t.getId());
             r.setDescription("考核主表 #" + t.getId() + " 等待处理");
             r.setTargetTableId(t.getId());
-            r.setSeverity("SELF_SUSPENDED".equals(t.getState()) ? 2 : 1);
+            r.setSeverity(AssessmentState.SELF_SUSPENDED.name().equals(t.getState()) ? 2 : 1);
             out.getTodos().add(r);
         }
 
@@ -72,7 +74,7 @@ public class HomeService {
             long days = ChronoUnit.DAYS.between(today, p.getSuspendEndDate());
             if (days >= 0 && days <= 3) {
                 RemindersResp.Reminder r = new RemindersResp.Reminder();
-                r.setType("SUSPEND_SOON");
+                r.setType(TYPE_SUSPEND_SOON);
                 r.setTitle("周期 " + p.getName() + " 自评挂起将在 " + days + " 天后结束");
                 r.setDescription("请及时确认推送或延长挂起时间");
                 r.setSeverity(days <= 1 ? 3 : 2);
