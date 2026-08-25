@@ -32,7 +32,7 @@ public class SysUserService {
     private final SysDepartmentMapper deptMapper;
     private final PasswordEncoder passwordEncoder;
 
-    private static final String DEFAULT_PWD = "Init@123456";
+    private static final String DEFAULT_PWD = "12345678";
 
     public Page<UserResp> page(String username, String role, Long deptId, Integer status,
                                int pageNo, int pageSize) {

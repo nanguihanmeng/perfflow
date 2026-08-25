@@ -1,7 +1,7 @@
 -- ===========================================================
 -- PerfFlow 建库脚本 (MySQL 8.0+)
 -- 字符集: utf8mb4 / 排序: utf8mb4_0900_ai_ci / 引擎: InnoDB
--- 密码: BCrypt(cost=10) of "Init@123456"
+-- 密码: BCrypt(cost=10) of "12345678"
 -- ===========================================================
 CREATE DATABASE IF NOT EXISTS `perfflow` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 USE `perfflow`;
@@ -140,8 +140,8 @@ SET FOREIGN_KEY_CHECKS = 1;
 
 -- ===========================================================
 -- 种子数据
--- BCrypt("Init@123456", cost=10) =
---   $2a$10$nP/hgmM0jVYi89G/cCItmuSxhDLw90tCw8NFs3lXBi7FpgUYtLmhC
+-- BCrypt("12345678", cost=10) =
+--   $2a$10$A/AjsVrRlMlr/EPFwiIBrORuNYUDrNMuPyu86JkJzwanumoBCyRV6
 -- ===========================================================
 INSERT INTO `sys_department`(`id`,`name`,`parent_id`,`sort`) VALUES
   (1,'技术部', 0, 1),
@@ -150,15 +150,15 @@ INSERT INTO `sys_department`(`id`,`name`,`parent_id`,`sort`) VALUES
 
 -- admin / hr / leader / 部门负责人 / 员工（绩效考核管理员与 ADMIN 无部门、不参与考核）
 INSERT INTO `sys_user`(`id`,`username`,`password`,`real_name`,`role`,`dept_id`,`dept_lead`,`status`,`must_change_password`) VALUES
-  (1,'admin',     '$2a$10$nP/hgmM0jVYi89G/cCItmuSxhDLw90tCw8NFs3lXBi7FpgUYtLmhC','系统管理员','ADMIN',     NULL, 0, 1, 1),
-  (2,'hr',        '$2a$10$nP/hgmM0jVYi89G/cCItmuSxhDLw90tCw8NFs3lXBi7FpgUYtLmhC','人事小李',  'PERFORMANCE_HR', NULL, 0, 1, 1),
-  (3,'leader',    '$2a$10$nP/hgmM0jVYi89G/cCItmuSxhDLw90tCw8NFs3lXBi7FpgUYtLmhC','王总监',   'LEAD',       NULL, 0, 1, 1),
-  (6,'emp01',     '$2a$10$nP/hgmM0jVYi89G/cCItmuSxhDLw90tCw8NFs3lXBi7FpgUYtLmhC','赵一',     'EMP',        1,    0, 1, 1),
-  (7,'emp02',     '$2a$10$nP/hgmM0jVYi89G/cCItmuSxhDLw90tCw8NFs3lXBi7FpgUYtLmhC','钱二',     'EMP',        1,    0, 1, 1),
-  (8,'emp03',     '$2a$10$nP/hgmM0jVYi89G/cCItmuSxhDLw90tCw8NFs3lXBi7FpgUYtLmhC','孙三',     'EMP',        2,    0, 1, 1),
-  (9,'wanggong',  '$2a$10$nP/hgmM0jVYi89G/cCItmuSxhDLw90tCw8NFs3lXBi7FpgUYtLmhC','王工',     'EMP',        1,    0, 1, 1),
-  (11,'bumen1',   '$2a$10$nP/hgmM0jVYi89G/cCItmuSxhDLw90tCw8NFs3lXBi7FpgUYtLmhC','张经理',   'DEPT_LEAD',  1,    1, 1, 1),
-  (12,'bumen2',   '$2a$10$nP/hgmM0jVYi89G/cCItmuSxhDLw90tCw8NFs3lXBi7FpgUYtLmhC','黄经理',   'DEPT_LEAD',  2,    1, 1, 1);
+  (1,'admin',     '$2a$10$A/AjsVrRlMlr/EPFwiIBrORuNYUDrNMuPyu86JkJzwanumoBCyRV6','系统管理员','ADMIN',     NULL, 0, 1, 1),
+  (2,'hr',        '$2a$10$A/AjsVrRlMlr/EPFwiIBrORuNYUDrNMuPyu86JkJzwanumoBCyRV6','人事小李',  'PERFORMANCE_HR', NULL, 0, 1, 1),
+  (3,'leader',    '$2a$10$A/AjsVrRlMlr/EPFwiIBrORuNYUDrNMuPyu86JkJzwanumoBCyRV6','王总监',   'LEAD',       NULL, 0, 1, 1),
+  (6,'emp01',     '$2a$10$A/AjsVrRlMlr/EPFwiIBrORuNYUDrNMuPyu86JkJzwanumoBCyRV6','赵一',     'EMP',        1,    0, 1, 1),
+  (7,'emp02',     '$2a$10$A/AjsVrRlMlr/EPFwiIBrORuNYUDrNMuPyu86JkJzwanumoBCyRV6','钱二',     'EMP',        1,    0, 1, 1),
+  (8,'emp03',     '$2a$10$A/AjsVrRlMlr/EPFwiIBrORuNYUDrNMuPyu86JkJzwanumoBCyRV6','孙三',     'EMP',        2,    0, 1, 1),
+  (9,'wanggong',  '$2a$10$A/AjsVrRlMlr/EPFwiIBrORuNYUDrNMuPyu86JkJzwanumoBCyRV6','王工',     'EMP',        1,    0, 1, 1),
+  (11,'bumen1',   '$2a$10$A/AjsVrRlMlr/EPFwiIBrORuNYUDrNMuPyu86JkJzwanumoBCyRV6','张经理',   'DEPT_LEAD',  1,    1, 1, 1),
+  (12,'bumen2',   '$2a$10$A/AjsVrRlMlr/EPFwiIBrORuNYUDrNMuPyu86JkJzwanumoBCyRV6','黄经理',   'DEPT_LEAD',  2,    1, 1, 1);
 
 -- 2026Q3 周期：start_date=2026-07-01, suspend_end=2026-09-25, dept_review=2026-10-10, lead_score=2026-10-25
 INSERT INTO `assessment_period`(`id`,`name`,`year`,`quarter`,`start_date`,`suspend_end_date`,`dept_review_end_date`,`lead_score_end_date`,`auto_push_on_expire`,`status`)
