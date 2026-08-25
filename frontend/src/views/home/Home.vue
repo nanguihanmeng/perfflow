@@ -63,9 +63,22 @@ const severityType = (severity: number): 'info' | 'warning' | 'danger' => {
   return 'info'
 }
 
+/** 各角色允许跳转的考核表详情路径（白名单，避免拼接任意路径） */
+const detailPathByRole: Record<string, string> = {
+  [Role.PERFORMANCE_HR]: '/hr/table/',
+  [Role.DEPT_LEAD]: '/dept/review/',
+  [Role.LEAD]: '/lead/score/',
+  [Role.EMP]: '/me/assessment/'
+}
+
 const goToTarget = (reminder: Reminder): void => {
-  if (reminder.targetTableId) {
-    router.push(`/hr/table/${reminder.targetTableId}`)
+  // targetTableId 必须为正整数（后端 DB 主键），非白名单角色不跳转
+  if (reminder.targetTableId == null || !Number.isInteger(reminder.targetTableId) || reminder.targetTableId <= 0) {
+    return
+  }
+  const base = detailPathByRole[authStore.role ?? '']
+  if (base) {
+    router.push(`${base}${reminder.targetTableId}`)
   }
 }
 </script>
@@ -79,7 +92,7 @@ const goToTarget = (reminder: Reminder): void => {
       </h2>
       <p class="home-welcome__desc">
         <template v-if="authStore.role !== Role.ADMIN">今日日期：{{ dayjs().format('YYYY-MM-DD') }}（{{ roleLabel }}）</template>
-        <template v-else>您正在使用系统管理员账号，无法访问业务数据（后端已做物理隔离）</template>
+        <template v-else>您正在使用系统管理员账号，无法访问业务数据</template>
       </p>
     </div>
 
@@ -116,7 +129,7 @@ const goToTarget = (reminder: Reminder): void => {
               <div class="home-reminder__group">
                 <div class="home-reminder__group-title">待办事项</div>
                 <el-empty v-if="reminders.todos.length === 0" description="无待办" :image-size="60" />
-                <div v-for="item in reminders.todos" :key="item.type" class="home-reminder__item">
+                <div v-for="(item, i) in reminders.todos" :key="item.targetTableId ?? `todo-${i}`" class="home-reminder__item">
                   <el-tag :type="severityType(item.severity)" size="small" effect="plain">
                     {{ severityLabel(item.severity) }}
                   </el-tag>
@@ -129,7 +142,7 @@ const goToTarget = (reminder: Reminder): void => {
               <div class="home-reminder__group">
                 <div class="home-reminder__group-title">挂起预警</div>
                 <el-empty v-if="reminders.upcomingSuspends.length === 0" description="无预警" :image-size="60" />
-                <div v-for="item in reminders.upcomingSuspends" :key="item.type" class="home-reminder__item">
+                <div v-for="(item, i) in reminders.upcomingSuspends" :key="`suspend-${i}`" class="home-reminder__item">
                   <el-tag :type="severityType(item.severity)" size="small" effect="plain">
                     {{ severityLabel(item.severity) }}
                   </el-tag>
@@ -143,7 +156,7 @@ const goToTarget = (reminder: Reminder): void => {
               <div class="home-reminder__group">
                 <div class="home-reminder__group-title">公示提醒</div>
                 <el-empty v-if="reminders.systemNotices.length === 0" description="无公示" :image-size="60" />
-                <div v-for="item in reminders.systemNotices" :key="item.type" class="home-reminder__item">
+                <div v-for="(item, i) in reminders.systemNotices" :key="`notice-${i}`" class="home-reminder__item">
                   <el-tag :type="severityType(item.severity)" size="small" effect="plain">
                     {{ severityLabel(item.severity) }}
                   </el-tag>

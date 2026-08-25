@@ -28,6 +28,8 @@ public class SysUser implements Serializable {
     private Integer status;
     private LocalDateTime lastLoginAt;
     private Boolean mustChangePassword;
+    /** 登录令牌版本号（多设备互踢：新登录自增，旧 token 失效） */
+    private Integer tokenVersion;
     @TableField(fill = com.baomidou.mybatisplus.annotation.FieldFill.INSERT)
     private LocalDateTime createdAt;
     @TableField(fill = com.baomidou.mybatisplus.annotation.FieldFill.INSERT_UPDATE)

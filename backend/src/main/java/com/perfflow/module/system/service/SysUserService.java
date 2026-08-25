@@ -12,6 +12,7 @@ import com.perfflow.module.system.entity.SysDepartment;
 import com.perfflow.module.system.entity.SysUser;
 import com.perfflow.module.system.mapper.SysDepartmentMapper;
 import com.perfflow.module.system.mapper.SysUserMapper;
+import com.perfflow.security.DataScopeContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -36,8 +37,12 @@ public class SysUserService {
     public Page<UserResp> page(String username, String role, Long deptId, Integer status,
                                int pageNo, int pageSize) {
         QueryWrapper<SysUser> qw = new QueryWrapper<>();
-        // 绩效考核管理员账号不可见（admin 不能管理）
+        // 绩效考核管理员账号不可见（admin 不能管理）；列表不显示当前登录用户自己
         qw.ne("role", RoleConst.ROLE_PERFORMANCE_HR);
+        Long currentUid = DataScopeContext.currentUserId();
+        if (currentUid != null) {
+            qw.ne("id", currentUid);
+        }
         if (StringUtils.hasText(username)) qw.like("username", username);
         if (StringUtils.hasText(role)) qw.eq("role", role);
         if (deptId != null) qw.eq("dept_id", deptId);
@@ -121,6 +126,7 @@ public class SysUserService {
     public void update(Long id, UserUpdateReq req) {
         SysUser u = userMapper.selectById(id);
         if (u == null) throw new BizException(ResultCode.NOT_FOUND);
+        assertNotSelf(id, "修改");
         assertNotPerformanceHr(u, "修改");
         if (req.getRole() != null && RoleConst.ROLE_PERFORMANCE_HR.equals(req.getRole())) {
             throw new BizException(ResultCode.BAD_REQUEST,
@@ -148,6 +154,19 @@ public class SysUserService {
         if (RoleConst.ROLE_PERFORMANCE_HR.equals(u.getRole())) {
             throw new BizException(ResultCode.BAD_REQUEST,
                     "绩效考核管理员账号不可" + action + "，仅可登录后自行修改资料");
+        }
+    }
+
+    /**
+     * 禁止操作当前登录用户自己的账号（不能删除/禁用/修改/重置自己）。
+     *
+     * @param id     目标用户ID
+     * @param action 操作名（用于提示）
+     */
+    private void assertNotSelf(Long id, String action) {
+        Long currentUid = DataScopeContext.currentUserId();
+        if (currentUid != null && currentUid.equals(id)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "不能" + action + "自己的账号");
         }
     }
 
@@ -180,6 +199,7 @@ public class SysUserService {
     public void delete(Long id) {
         SysUser u = userMapper.selectById(id);
         if (u == null) throw new BizException(ResultCode.NOT_FOUND);
+        assertNotSelf(id, "删除");
         if ("admin".equals(u.getUsername())) {
             throw new BizException(ResultCode.BAD_REQUEST, "内置管理员不可删除");
         }
@@ -191,6 +211,8 @@ public class SysUserService {
     public String resetPassword(Long id) {
         SysUser u = userMapper.selectById(id);
         if (u == null) throw new BizException(ResultCode.NOT_FOUND);
+        assertNotSelf(id, "重置密码");
+        assertNotPerformanceHr(u, "重置密码");
         u.setPassword(passwordEncoder.encode(DEFAULT_PWD));
         u.setMustChangePassword(true);
         userMapper.updateById(u);
@@ -201,6 +223,7 @@ public class SysUserService {
     public void toggleStatus(Long id) {
         SysUser u = userMapper.selectById(id);
         if (u == null) throw new BizException(ResultCode.NOT_FOUND);
+        assertNotSelf(id, "禁用/启用");
         assertNotPerformanceHr(u, "禁用/启用");
         u.setStatus(u.getStatus() != null && u.getStatus() == 1 ? 0 : 1);
         userMapper.updateById(u);

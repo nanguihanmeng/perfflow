@@ -72,6 +72,17 @@ public class AssessmentExportService {
 
         try (ExcelWriter writer = ExcelUtil.getWriter();
              ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            // 列宽：文本列加宽 + 自动换行，确保格子内文字完整显示
+            writer.setColumnWidth(0, 18);   // A 部门/标题
+            writer.setColumnWidth(1, 14);   // B 序号/被考核人
+            writer.setColumnWidth(2, 14);   // C 指标类别/岗位
+            writer.setColumnWidth(3, 30);   // D 指标名称
+            writer.setColumnWidth(4, 12);   // E 指标分数
+            writer.setColumnWidth(5, 36);   // F 工作目标
+            writer.setColumnWidth(6, 36);   // G 评分标准
+            writer.setColumnWidth(7, 12);   // H 完成率
+            writer.setColumnWidth(8, 12);   // I 自评得分
+            writer.getStyleSet().setWrapText();
             int idx = 0;
             for (AssessmentTable t : tables) {
                 writeTable(writer, t, period, idx, userCache, deptCache, deptLeadCache);

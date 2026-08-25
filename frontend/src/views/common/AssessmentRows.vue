@@ -159,7 +159,8 @@ const spanMethod = ({ row, columnIndex }: { row: RowResp; columnIndex: number })
       </el-table-column>
       <el-table-column v-if="editable" label="操作" width="90" align="center" fixed="right">
         <template #default="{ row }">
-          <template v-if="row.category !== RowCategory.BONUS">
+          <!-- 加减分项：仅部门领导可编辑，员工不可 -->
+          <template v-if="row.category !== RowCategory.BONUS || isDeptLead">
             <el-button
               v-if="editingRowId !== row.id"
               link

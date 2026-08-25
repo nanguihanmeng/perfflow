@@ -83,7 +83,7 @@ public class AssessmentPermissionService {
         }
     }
 
-    /** 当前用户能否改某行（员工填完成率；部门领导在审核阶段改自评得分；加减分项均不可编辑） */
+    /** 当前用户能否改某行（员工填完成率；部门领导可改自评得分含加减分项） */
     public boolean canEditRow(AssessmentTable t, AssessmentRow r) {
         String role = currentRole();
         if (role == null) return false;
@@ -93,12 +93,14 @@ public class AssessmentPermissionService {
             case RoleConst.ROLE_EMP -> {
                 boolean isMine = DataScopeContext.currentUserId() != null
                         && DataScopeContext.currentUserId().equals(t.getUserId());
+                // 员工不可填加减分项
                 yield isMine && cur == AssessmentState.SELF_DRAFTING && isPlanOrOpen;
             }
             case RoleConst.ROLE_DEPT_LEAD -> {
                 boolean sameDept = DataScopeContext.currentDeptId() != null
                         && DataScopeContext.currentDeptId().equals(t.getDeptId());
-                yield sameDept && cur == AssessmentState.DEPT_REVIEW && isPlanOrOpen;
+                // 部门领导可编辑全部行（含加减分项）
+                yield sameDept && cur == AssessmentState.DEPT_REVIEW;
             }
             default -> false;
         };

@@ -3,6 +3,8 @@ package com.perfflow.security;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.perfflow.common.api.Result;
 import com.perfflow.common.api.ResultCode;
+import com.perfflow.module.system.entity.SysUser;
+import com.perfflow.module.system.mapper.SysUserMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -28,6 +30,9 @@ import java.util.Set;
 
 /**
  * 解析 Authorization 头中的 Bearer Token，写入 SecurityContext 与 DataScopeContext。
+ *
+ * <p>校验令牌版本号：token 中携带的 tokenVersion 必须与库内一致，
+ * 否则判定为旧设备令牌（账号已在其他设备登录），返回 401。
  */
 @Slf4j
 @Component
@@ -37,6 +42,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER = "Bearer ";
     private final JwtUtil jwtUtil;
     private final ObjectMapper objectMapper;
+    private final SysUserMapper userMapper;
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
@@ -60,6 +66,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
 
             Long userId = Long.valueOf(c.getSubject());
+            // 校验令牌版本号：与库内一致才有效（单账号多设备互踢）
+            Integer tokenVersion = c.get("tokenVersion", Integer.class);
+            SysUser dbUser = userMapper.selectById(userId);
+            if (dbUser == null) {
+                writeJson(response, HttpStatus.UNAUTHORIZED,
+                        Result.fail(ResultCode.TOKEN_INVALID, "用户不存在"));
+                return;
+            }
+            Integer dbVersion = dbUser.getTokenVersion() == null ? 0 : dbUser.getTokenVersion();
+            if (tokenVersion == null || !tokenVersion.equals(dbVersion)) {
+                writeJson(response, HttpStatus.UNAUTHORIZED,
+                        Result.fail(ResultCode.TOKEN_INVALID, "账号已在其他设备登录，请重新登录"));
+                return;
+            }
+
             String username = c.get("username", String.class);
             String role = c.get("role", String.class); // 主角色不带 ROLE_
             Long deptId = c.get("deptId", Long.class);

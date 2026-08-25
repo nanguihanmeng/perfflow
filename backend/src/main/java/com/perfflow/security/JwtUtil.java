@@ -53,15 +53,17 @@ public class JwtUtil {
         this.issuer = issuer;
     }
 
-    public String generateAccess(Long userId, String username, String role, Long deptId, Boolean deptLead, Boolean mustChangePwd) {
-        return generate(userId, username, role, deptId, deptLead, mustChangePwd, "access", accessTtl);
+    public String generateAccess(Long userId, String username, String role, Long deptId, Boolean deptLead,
+                                 Boolean mustChangePwd, Integer tokenVersion) {
+        return generate(userId, username, role, deptId, deptLead, mustChangePwd, "access", accessTtl, tokenVersion);
     }
 
-    public String generateRefresh(Long userId, String username, String role) {
-        return generate(userId, username, role, null, false, false, "refresh", refreshTtl);
+    public String generateRefresh(Long userId, String username, String role, Integer tokenVersion) {
+        return generate(userId, username, role, null, false, false, "refresh", refreshTtl, tokenVersion);
     }
 
-    private String generate(Long userId, String username, String role, Long deptId, Boolean deptLead, Boolean mustChangePwd, String type, long ttl) {
+    private String generate(Long userId, String username, String role, Long deptId, Boolean deptLead,
+                            Boolean mustChangePwd, String type, long ttl, Integer tokenVersion) {
         long now = System.currentTimeMillis();
         return Jwts.builder()
                 .issuer(issuer)
@@ -72,6 +74,7 @@ public class JwtUtil {
                 .claim("deptLead", deptLead != null && deptLead)
                 .claim("mustChangePwd", mustChangePwd != null && mustChangePwd)
                 .claim("type", type)
+                .claim("tokenVersion", tokenVersion == null ? 0 : tokenVersion)
                 .issuedAt(new Date(now))
                 .expiration(new Date(now + ttl * 1000))
                 .signWith(key)

@@ -48,13 +48,15 @@ public class AuthService {
             if (u == null) {
                 throw new BizException(ResultCode.LOGIN_INVALID);
             }
-            // 记 last_login_at
+            // 记 last_login_at + 令牌版本号自增（新登录使旧设备 token 失效，实现互踢）
             u.setLastLoginAt(LocalDateTime.now());
+            int tokenVersion = (u.getTokenVersion() == null ? 0 : u.getTokenVersion()) + 1;
+            u.setTokenVersion(tokenVersion);
             userMapper.updateById(u);
 
             String access = jwtUtil.generateAccess(u.getId(), u.getUsername(), u.getRole(),
-                    u.getDeptId(), u.getDeptLead(), u.getMustChangePassword());
-            String refresh = jwtUtil.generateRefresh(u.getId(), u.getUsername(), u.getRole());
+                    u.getDeptId(), u.getDeptLead(), u.getMustChangePassword(), tokenVersion);
+            String refresh = jwtUtil.generateRefresh(u.getId(), u.getUsername(), u.getRole(), tokenVersion);
 
             LoginResp resp = new LoginResp();
             resp.setAccessToken(access);
@@ -137,8 +139,10 @@ public class AuthService {
             Long userId = Long.valueOf(c.getSubject());
             SysUser u = userMapper.selectById(userId);
             if (u == null) throw new BizException(ResultCode.TOKEN_INVALID);
+            // 刷新沿用当前令牌版本号（不改变版本，避免刷新导致旧 token 互踢）
+            Integer tokenVersion = u.getTokenVersion() == null ? 0 : u.getTokenVersion();
             String access = jwtUtil.generateAccess(u.getId(), u.getUsername(), u.getRole(),
-                    u.getDeptId(), u.getDeptLead(), u.getMustChangePassword());
+                    u.getDeptId(), u.getDeptLead(), u.getMustChangePassword(), tokenVersion);
             LoginResp resp = new LoginResp();
             resp.setAccessToken(access);
             resp.setExpiresIn(jwtUtil.getAccessTtl());

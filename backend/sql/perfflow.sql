@@ -39,6 +39,7 @@ CREATE TABLE `sys_user` (
   `status`          TINYINT         NOT NULL DEFAULT 1,
   `last_login_at`   DATETIME        NULL,
   `must_change_password` TINYINT(1) NOT NULL DEFAULT 0,
+  `token_version`   INT             NOT NULL DEFAULT 0 COMMENT '登录令牌版本号（多设备互踢）',
   `created_at`      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at`      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
