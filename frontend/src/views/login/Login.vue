@@ -7,6 +7,7 @@ import { useRoute, useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'element-plus'
 import { loginApi } from '@/api/auth.api'
 import { useAuthStore } from '@/store/auth'
+import { Role } from '@/types/enums'
 import { toastSuccess } from '@/utils/message'
 
 const route = useRoute()
@@ -42,6 +43,11 @@ const handleLogin = async (): Promise<void> => {
       return
     }
     const redirect = (route.query.redirect as string) || '/'
+    // 管理员登录后回到管理员界面（redirect 若为业务路径会被守卫拦，统一回 /home）
+    if (res.data.role === Role.ADMIN) {
+      router.push('/home')
+      return
+    }
     router.push(redirect)
   } finally {
     loading.value = false

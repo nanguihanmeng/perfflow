@@ -29,8 +29,9 @@ export const setupRouterGuards = (router: Router): void => {
     const role = authStore.role
 
     // ADMIN 禁止访问业务路由（与后端 403 + 1007 一致）
+    // 重定向回工作台而非 403 页，保证管理员始终能进入管理员界面
     if (role === Role.ADMIN && to.meta.adminDenied) {
-      return { path: '/403' }
+      return { path: '/home' }
     }
 
     // 强制改密：mustChangePassword=true 且未在改密流程中

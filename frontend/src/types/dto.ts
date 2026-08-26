@@ -231,15 +231,11 @@ export interface DeptResp {
   id: number
   name: string
   parentId: number | null
-  leaderUserId: number | null
-  sort: number
   remark: string | null
 }
 
 export interface DeptReq {
   name: string
   parentId?: number | null
-  leaderUserId?: number | null
-  sort?: number
   remark?: string | null
 }

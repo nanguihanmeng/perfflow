@@ -11,7 +11,5 @@ public class DeptReq implements Serializable {
     @NotBlank
     private String name;
     private Long parentId;
-    private Long leaderUserId;
-    private Integer sort;
     private String remark;
 }

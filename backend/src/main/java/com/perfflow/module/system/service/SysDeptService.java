@@ -40,8 +40,6 @@ public class SysDeptService {
         SysDepartment d = new SysDepartment();
         d.setName(req.getName());
         d.setParentId(req.getParentId() == null ? 0L : req.getParentId());
-        d.setLeaderUserId(req.getLeaderUserId());
-        d.setSort(req.getSort() == null ? 0 : req.getSort());
         d.setRemark(req.getRemark());
         deptMapper.insert(d);
         return d.getId();
@@ -61,8 +59,6 @@ public class SysDeptService {
             d.setName(req.getName());
         }
         if (req.getParentId() != null) d.setParentId(req.getParentId());
-        if (req.getLeaderUserId() != null) d.setLeaderUserId(req.getLeaderUserId());
-        if (req.getSort() != null) d.setSort(req.getSort());
         if (req.getRemark() != null) d.setRemark(req.getRemark());
         deptMapper.updateById(d);
     }

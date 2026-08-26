@@ -34,8 +34,6 @@ const editingId = ref<number | null>(null)
 const form = reactive<DeptReq>({
   name: '',
   parentId: null,
-  leaderUserId: null,
-  sort: 0,
   remark: ''
 })
 
@@ -43,8 +41,6 @@ const openCreate = (): void => {
   editingId.value = null
   form.name = ''
   form.parentId = null
-  form.leaderUserId = null
-  form.sort = 0
   form.remark = ''
   dialogVisible.value = true
 }
@@ -53,8 +49,6 @@ const openEdit = (row: DeptResp): void => {
   editingId.value = row.id
   form.name = row.name
   form.parentId = row.parentId
-  form.leaderUserId = row.leaderUserId
-  form.sort = row.sort
   form.remark = row.remark ?? ''
   dialogVisible.value = true
 }
@@ -109,10 +103,6 @@ const parentOptions = (): DeptResp[] => list.value.filter((d) => d.id !== editin
             {{ list.find((d) => d.id === row.parentId)?.name ?? '—' }}
           </template>
         </el-table-column>
-        <el-table-column prop="leaderUserId" label="负责人ID" width="100" align="center">
-          <template #default="{ row }">{{ row.leaderUserId ?? '—' }}</template>
-        </el-table-column>
-        <el-table-column prop="sort" label="排序" width="80" align="center" />
         <el-table-column prop="remark" label="备注" min-width="160">
           <template #default="{ row }">{{ row.remark || '—' }}</template>
         </el-table-column>
@@ -135,11 +125,6 @@ const parentOptions = (): DeptResp[] => list.value.filter((d) => d.id !== editin
           <el-select v-model="form.parentId" clearable placeholder="无" style="width: 100%">
             <el-option v-for="d in parentOptions()" :key="d.id" :label="d.name" :value="d.id" />
           </el-select>
-        </el-form-item>
-        <el-form-item label="负责人ID">
-          <el-input-number v-model="form.leaderUserId" :min="1" :value-on-clear="null" style="width: 100%" />
-        </el-form-item>        <el-form-item label="排序">
-          <el-input-number v-model="form.sort" :min="0" style="width: 100%" />
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="255" />

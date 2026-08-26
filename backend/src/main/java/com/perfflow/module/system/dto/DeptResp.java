@@ -11,8 +11,6 @@ public class DeptResp implements Serializable {
     private Long id;
     private String name;
     private Long parentId;
-    private Long leaderUserId;
-    private Integer sort;
     private String remark;
 
     public static DeptResp from(SysDepartment d) {
@@ -20,8 +18,6 @@ public class DeptResp implements Serializable {
         r.setId(d.getId());
         r.setName(d.getName());
         r.setParentId(d.getParentId());
-        r.setLeaderUserId(d.getLeaderUserId());
-        r.setSort(d.getSort());
         r.setRemark(d.getRemark());
         return r;
     }
