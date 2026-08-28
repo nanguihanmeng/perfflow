@@ -85,12 +85,16 @@ public class AuthService {
     }
 
     /**
-     * 修改当前登录用户的密码，并清除强制改密标记。
+     * 修改当前登录用户的密码，清除强制改密标记，并返回新令牌（改密后无需重新登录）。
+     *
+     * <p>改密前签发的令牌中 {@code mustChangePwd=true} 会被前端路由守卫拦截，
+     * 因此改密后前端必须用返回的新令牌覆盖本地登录态，才能正常访问业务页面。
      *
      * @param newPassword 新密码（明文，入库前 BCrypt 加密）
+     * @return 携带新令牌的登录响应（令牌版本号自增，改密前旧令牌立即失效）
      */
     @Transactional
-    public void changePassword(String newPassword) {
+    public LoginResp changePassword(String newPassword) {
         Long userId = DataScopeContext.currentUserId();
         if (userId == null) {
             throw new BizException(ResultCode.UNAUTHORIZED);
@@ -101,8 +105,32 @@ public class AuthService {
         }
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setMustChangePassword(false);
+        // 令牌版本号自增：改密前签发的旧令牌立即失效（与登录互踢机制一致）
+        int tokenVersion = (user.getTokenVersion() == null ? 0 : user.getTokenVersion()) + 1;
+        user.setTokenVersion(tokenVersion);
         userMapper.updateById(user);
+
+        String access = jwtUtil.generateAccess(user.getId(), user.getUsername(), user.getRole(),
+                user.getDeptId(), user.getDeptLead(), false, tokenVersion);
+        String refresh = jwtUtil.generateRefresh(user.getId(), user.getUsername(), user.getRole(), tokenVersion);
+
+        LoginResp resp = new LoginResp();
+        resp.setAccessToken(access);
+        resp.setRefreshToken(refresh);
+        resp.setExpiresIn(jwtUtil.getAccessTtl());
+        resp.setUserId(user.getId());
+        resp.setUsername(user.getUsername());
+        resp.setRealName(user.getRealName());
+        resp.setRole(user.getRole());
+        resp.setDeptId(user.getDeptId());
+        resp.setDeptLead(user.getDeptLead());
+        resp.setMustChangePassword(false);
+        if (user.getDeptId() != null) {
+            SysDepartment d = deptMapper.selectById(user.getDeptId());
+            if (d != null) resp.setDeptName(d.getName());
+        }
         log.info("修改密码成功: userId={}", userId);
+        return resp;
     }
 
     /**

@@ -18,13 +18,18 @@ interface MenuItem {
 }
 
 const MENUS: MenuItem[] = [
-  { title: '工作台', path: '/home', roles: [Role.EMP, Role.DEPT_LEAD, Role.LEAD, Role.PERFORMANCE_HR, Role.ADMIN] },
-  { title: '个人中心', path: '/profile', roles: [Role.EMP, Role.DEPT_LEAD, Role.LEAD, Role.PERFORMANCE_HR, Role.ADMIN] },
+  { title: '工作台', path: '/home', roles: [Role.EMP, Role.DEPT_LEAD, Role.LEAD, Role.PERFORMANCE_HR, Role.ADMIN, Role.DEPT_STAFF, Role.OPERATION, Role.COMMITTEE] },
+  { title: '个人中心', path: '/profile', roles: [Role.EMP, Role.DEPT_LEAD, Role.LEAD, Role.PERFORMANCE_HR, Role.ADMIN, Role.DEPT_STAFF, Role.OPERATION, Role.COMMITTEE] },
+  { title: '我的通知', path: '/notifications', roles: [Role.EMP, Role.DEPT_LEAD, Role.LEAD, Role.PERFORMANCE_HR, Role.DEPT_STAFF, Role.OPERATION, Role.COMMITTEE] },
   { title: '我的考核表', path: '/me/assessment', roles: [Role.EMP] },
   { title: '部门审核', path: '/dept/review', roles: [Role.DEPT_LEAD] },
   { title: '领导评分', path: '/lead/score', roles: [Role.LEAD] },
   { title: '周期管理', path: '/hr/period', roles: [Role.PERFORMANCE_HR] },
   { title: '考核列表', path: '/hr/list', roles: [Role.LEAD, Role.PERFORMANCE_HR] },
+  { title: '部门考核填报', path: '/dept-staff/assessment', roles: [Role.DEPT_STAFF] },
+  { title: '进度看板', path: '/operation/dashboard', roles: [Role.OPERATION, Role.COMMITTEE] },
+  { title: '部门考核初审', path: '/operation/dept-audit', roles: [Role.OPERATION] },
+  { title: '部门考核审批', path: '/committee/approve', roles: [Role.COMMITTEE] },
   { title: '用户管理', path: '/admin/users', roles: [Role.ADMIN] },
   { title: '部门管理', path: '/admin/depts', roles: [Role.ADMIN] }
 ]

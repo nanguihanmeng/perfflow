@@ -4,9 +4,11 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.perfflow.common.api.ResultCode;
 import com.perfflow.common.exception.BizException;
 import com.perfflow.module.assessment.service.AssessmentTableService;
+import com.perfflow.module.deptassessment.service.DeptAssessmentService;
 import com.perfflow.module.period.dto.PeriodCreateReq;
 import com.perfflow.module.period.dto.PeriodResp;
 import com.perfflow.module.period.entity.AssessmentPeriod;
+import com.perfflow.module.period.enums.PeriodType;
 import com.perfflow.module.period.mapper.AssessmentPeriodMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -14,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -38,6 +41,7 @@ public class AssessmentPeriodService {
 
     private final AssessmentPeriodMapper periodMapper;
     private final AssessmentTableService tableService;
+    private final DeptAssessmentService deptAssessmentService;
 
     /**
      * 查询全部周期，按年/季度倒序。
@@ -80,21 +84,32 @@ public class AssessmentPeriodService {
     /**
      * 创建考核周期。
      *
+     * <p>按周期类型校验：年度类型（表3/5/7）季度强制为 0；同一 年+季度+类型 唯一。
+     *
      * @param req 创建请求
      * @return 新周期ID
-     * @throws BizException 同年同季度已存在时抛出
+     * @throws BizException 校验失败或已存在时抛出
      */
     @Transactional(rollbackFor = Exception.class)
     public Long create(PeriodCreateReq req) {
+        PeriodType type = PeriodType.of(req.getPeriodType());
+        Integer quarter = req.getQuarter() == null ? 0 : req.getQuarter();
+        if (type.isAnnual()) {
+            // 年度周期无季度概念，统一按 0 存储（唯一键 year+quarter+period_type 区分年度多表）
+            quarter = 0;
+        }
         Long exist = periodMapper.selectCount(new QueryWrapper<AssessmentPeriod>()
-                .eq("year", req.getYear()).eq("quarter", req.getQuarter()));
+                .eq("year", req.getYear())
+                .eq("quarter", quarter)
+                .eq("period_type", type.name()));
         if (exist != null && exist > 0) {
-            throw new BizException(ResultCode.BAD_REQUEST, "该季度周期已存在");
+            throw new BizException(ResultCode.BAD_REQUEST, "该年份该类型周期已存在");
         }
         AssessmentPeriod p = new AssessmentPeriod();
         p.setName(req.getName());
+        p.setPeriodType(type.name());
         p.setYear(req.getYear());
-        p.setQuarter(req.getQuarter());
+        p.setQuarter(quarter);
         p.setStartDate(req.getStartDate());
         p.setSuspendEndDate(req.getSuspendEndDate());
         p.setDeptReviewEndDate(req.getDeptReviewEndDate());
@@ -106,22 +121,30 @@ public class AssessmentPeriodService {
     }
 
     /**
-     * 打开周期：状态置为进行中，并为指定员工（或全员）生成主表 + 10 行模板。
+     * 打开周期：状态置为进行中，并按类型生成考核表。
+     *
+     * <p>个人线（表1-4）：为勾选的被考核人生成个人考核主表 + 10 行模板；
+     * 部门线（表5-7）：为勾选的部门生成部门考核主表 + KPI 行模板。
      *
      * @param id      周期ID
-     * @param userIds 参与考核的员工 ID 列表，为空表示全员
+     * @param userIds 参与考核的员工 ID 列表（个人线，为空表示全员）
+     * @param deptIds 参与考核的部门 ID 列表（部门线，为空表示全部部门）
      * @throws BizException 周期不存在或已结束时抛出
      */
     @Transactional(rollbackFor = Exception.class)
-    public void open(Long id, List<Long> userIds) {
+    public void open(Long id, List<Long> userIds, List<Long> deptIds) {
         AssessmentPeriod p = required(id);
         if (Integer.valueOf(STATUS_CLOSED).equals(p.getStatus())) {
             throw new BizException(ResultCode.BAD_REQUEST, "周期已结束");
         }
         p.setStatus(STATUS_OPEN);
         periodMapper.updateById(p);
-        // 初始化主表 + 10 行模板
-        tableService.initForPeriod(p, userIds);
+        PeriodType type = PeriodType.of(p.getPeriodType());
+        if (type.isDeptLine()) {
+            deptAssessmentService.initForPeriod(p, deptIds);
+        } else {
+            tableService.initForPeriod(p, userIds);
+        }
     }
 
     /**

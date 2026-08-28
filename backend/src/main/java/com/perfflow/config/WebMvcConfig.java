@@ -23,7 +23,16 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/assessment-tables/**",
                         "/periods",
                         "/periods/**",
-                        "/home/**"
+                        "/home/**",
+                        // 企业级升级新增模块（ADMIN 不可访问）
+                        "/dept-assessments",
+                        "/dept-assessments/**",
+                        "/monitor",
+                        "/monitor/**",
+                        "/notifications",
+                        "/notifications/**",
+                        "/audit-logs",
+                        "/audit-logs/**"
                 );
     }
 }

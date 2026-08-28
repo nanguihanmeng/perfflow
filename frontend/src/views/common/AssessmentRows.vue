@@ -62,8 +62,8 @@ const cancelEdit = (): void => {
 
 const saveRow = async (row: RowResp): Promise<void> => {
   if (isDeptLead.value) {
-    // 部门领导：自评得分 0~指标分数
-    const max = Number(row.baseScore ?? 100)
+    // 部门领导：自评得分 0~|指标分数|（负数指标分数为加减分项，按绝对值作为减分上限）
+    const max = Math.abs(Number(row.baseScore ?? 100))
     if (draft.value !== '' && !isScoreInRange(draft.value, 0, max)) {
       toastError(`自评得分必须在 0-${max} 之间`)
       return
@@ -150,7 +150,7 @@ const spanMethod = ({ row, columnIndex }: { row: RowResp; columnIndex: number })
       <el-table-column label="自评得分" width="90" align="center">
         <template #default="{ row }">
           <template v-if="editable && isDeptLead && editingRowId === row.id">
-            <el-input v-model="draft.value" :placeholder="`0-${row.baseScore ?? 100}`" size="small" />
+            <el-input v-model="draft.value" :placeholder="`0-${Math.abs(Number(row.baseScore ?? 100))}`" size="small" />
           </template>
           <template v-else>
             <ScoreDisplay :value="row.selfScore" :masked="row.masked" />

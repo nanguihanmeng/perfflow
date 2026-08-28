@@ -28,6 +28,16 @@ public class AssessmentTable implements Serializable {
     private BigDecimal leaderScore;
     private BigDecimal finalScore;
     private String grade;
+    /** 部门等级（冗余，等级联动写入） */
+    private String deptGrade;
+    /** 该员工所在部门各等级名额 */
+    private Integer quotaGradeA;
+    private Integer quotaGradeB;
+    private Integer quotaGradeC;
+    private Integer quotaGradeD;
+    /** 权重快照 */
+    private BigDecimal deptScoreWeight;
+    private BigDecimal personalScoreWeight;
     private Integer suspendExtendedDays;
     private LocalDateTime submittedAt;
     private LocalDateTime pushedAt;

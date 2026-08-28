@@ -70,11 +70,14 @@ public class AssessmentRowService {
             // 全部行按完成率重算 + 求和（保持整表一致）
             calcService.recalcByCompletionRate(t);
         } else if (perm.isDeptLead()) {
-            // 部门领导：直接改自评得分（0~该行指标分数）
+            // 部门领导：直接改自评得分。
+            // 上限取该行指标分数的绝对值：指标分数为负数（加减分项）时表示减分，
+            // 允许按「0 ~ |指标分数|」之间录入减分，负数指标分数不再阻断保存。
             if (req.getSelfScore() == null) {
                 throw new BizException(ResultCode.BAD_REQUEST, "自评得分不能为空");
             }
-            BigDecimal max = r.getBaseScore() == null ? BigDecimal.valueOf(100) : r.getBaseScore();
+            BigDecimal base = r.getBaseScore() == null ? BigDecimal.valueOf(100) : r.getBaseScore();
+            BigDecimal max = base.abs();
             if (req.getSelfScore().compareTo(BigDecimal.ZERO) < 0
                     || req.getSelfScore().compareTo(max) > 0) {
                 throw new BizException(ResultCode.BAD_REQUEST,

@@ -1,13 +1,16 @@
 <script setup lang="ts">
 /**
- * 周期管理（HR）：周期列表 + 新建 / 开启 / 关闭
+ * 周期管理（HR）：周期列表 + 新建（7 种类型）/ 开启（按类型选人/选部门）/ 关闭
  */
-import { nextTick, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import type { TableInstance } from 'element-plus'
 import { createPeriodApi, getPeriodListApi, openPeriodApi, closePeriodApi, importPeriodApi } from '@/api/period.api'
 import { getUserOptionsApi } from '@/api/system.api'
-import type { PeriodCreateReq, PeriodResp, UserResp } from '@/types/dto'
+import { getDeptOptionsApi } from '@/api/dept.api'
+import type { PeriodCreateReq, PeriodResp, UserResp, DeptResp } from '@/types/dto'
 import { PeriodStatus } from '@/types/enums'
+import { PERIOD_TYPES, getPeriodType } from '@/types/periodType'
+import { RoleLabel } from '@/types/role'
 import { confirmAction, toastError, toastSuccess } from '@/utils/message'
 import { formatDate } from '@/utils/format'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -42,11 +45,12 @@ const statusType = (status: number): 'info' | 'success' | 'warning' => {
   return 'warning'
 }
 
-/** 新建周期对话框 */
+/* ---------------- 新建周期对话框 ---------------- */
 const createVisible = ref(false)
 const createSaving = ref(false)
 const createForm = reactive<PeriodCreateReq>({
   name: '',
+  periodType: 'QUARTER_ASSESS',
   year: new Date().getFullYear(),
   quarter: 1,
   startDate: '',
@@ -56,8 +60,12 @@ const createForm = reactive<PeriodCreateReq>({
   autoPushOnExpire: false
 })
 
+/** 当前选中类型元数据 */
+const selectedType = computed(() => getPeriodType(createForm.periodType))
+
 const openCreate = (): void => {
   createForm.name = ''
+  createForm.periodType = 'QUARTER_ASSESS'
   createForm.year = new Date().getFullYear()
   createForm.quarter = 1
   createForm.startDate = ''
@@ -83,39 +91,57 @@ const submitCreate = async (): Promise<void> => {
   }
 }
 
-/** 开启周期：员工勾选对话框 */
+/* ---------------- 开启周期对话框（个人线选人 / 部门线选部门） ---------------- */
 const openVisible = ref(false)
 const openSaving = ref(false)
 const openTarget = ref<PeriodResp | null>(null)
 const empOptions = ref<UserResp[]>([])
+const deptOptions = ref<DeptResp[]>([])
 const empLoading = ref(false)
+const deptLoading = ref(false)
 const selectedIds = ref<number[]>([])
+const selectedDeptIds = ref<number[]>([])
 const empTableRef = ref<TableInstance>()
+const deptTableRef = ref<TableInstance>()
 
-const roleLabel = (role: string): string => {
-  const map: Record<string, string> = {
-    EMP: '员工',
-    DEPT_LEAD: '部门负责人',
-    LEAD: '总监',
-    HR: '人事'
-  }
-  return map[role] ?? role
-}
+const isDeptLine = computed(() => getPeriodType(openTarget.value?.periodType)?.line === '部门')
+
+/** 个人线：仅展示该类型可参与填报的角色 */
+const assessedRoles = computed(() => {
+  const type = getPeriodType(openTarget.value?.periodType)
+  if (!type) return []
+  // 个人线参与填报 = 被考核人（EMP/DEPT_LEAD/LEAD/DEPT_STAFF/OPERATION/COMMITTEE）
+  return ['EMP', 'DEPT_LEAD', 'LEAD', 'DEPT_STAFF', 'OPERATION', 'COMMITTEE']
+})
 
 const handleOpen = async (row: PeriodResp): Promise<void> => {
   openTarget.value = row
   selectedIds.value = []
+  selectedDeptIds.value = []
   empOptions.value = []
+  deptOptions.value = []
   openVisible.value = true
-  empLoading.value = true
-  try {
-    const res = await getUserOptionsApi()
-    empOptions.value = res.data
-    // 默认全选（等表格渲染完成后）
-    await nextTick()
-    empTableRef.value?.toggleAllSelection()
-  } finally {
-    empLoading.value = false
+  if (isDeptLine.value) {
+    deptLoading.value = true
+    try {
+      const res = await getDeptOptionsApi()
+      deptOptions.value = res.data
+      await nextTick()
+      deptTableRef.value?.toggleAllSelection()
+    } finally {
+      deptLoading.value = false
+    }
+  } else {
+    empLoading.value = true
+    try {
+      const res = await getUserOptionsApi(assessedRoles.value)
+      empOptions.value = res.data
+      // 默认全选（等表格渲染完成后）
+      await nextTick()
+      empTableRef.value?.toggleAllSelection()
+    } finally {
+      empLoading.value = false
+    }
   }
 }
 
@@ -123,8 +149,24 @@ const submitOpen = async (): Promise<void> => {
   if (!openTarget.value) {
     return
   }
+  if (isDeptLine.value) {
+    if (selectedDeptIds.value.length === 0) {
+      toastSuccess('请至少选择一个部门')
+      return
+    }
+    openSaving.value = true
+    try {
+      await openPeriodApi(openTarget.value.id, [], selectedDeptIds.value)
+      openVisible.value = false
+      toastSuccess('周期已开启')
+      await loadList()
+    } finally {
+      openSaving.value = false
+    }
+    return
+  }
   if (selectedIds.value.length === 0) {
-    toastSuccess('请至少选择一名员工')
+    toastSuccess('请至少选择一名被考核人')
     return
   }
   openSaving.value = true
@@ -177,7 +219,7 @@ const handleClose = async (row: PeriodResp): Promise<void> => {
 
 <template>
   <div class="period-manage page-container">
-    <PageHeader title="周期管理" description="创建与管理考核周期">
+    <PageHeader title="周期管理" description="创建与管理考核周期（支持 7 种考核表类型）">
       <template #actions>
         <el-button type="primary" @click="openCreate">新建周期</el-button>
       </template>
@@ -186,11 +228,18 @@ const handleClose = async (row: PeriodResp): Promise<void> => {
     <div class="card">
       <el-table v-loading="loading" :data="list" border stripe>
         <el-table-column prop="name" label="周期名称" min-width="160" />
+        <el-table-column label="类型" width="160" align="center">
+          <template #default="{ row }">
+            <el-tag size="small" effect="plain" :type="getPeriodType(row.periodType)?.line === '部门' ? 'success' : 'primary'">
+              {{ row.periodTypeLabel || getPeriodType(row.periodType)?.label || row.periodType }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="年份" width="80" align="center">
           <template #default="{ row }">{{ row.year }}</template>
         </el-table-column>
         <el-table-column label="季度" width="80" align="center">
-          <template #default="{ row }">Q{{ row.quarter }}</template>
+          <template #default="{ row }">{{ row.quarter > 0 ? 'Q' + row.quarter : '年度' }}</template>
         </el-table-column>
         <el-table-column label="开始日期" width="120" align="center">
           <template #default="{ row }">{{ formatDate(row.startDate) }}</template>
@@ -231,15 +280,30 @@ const handleClose = async (row: PeriodResp): Promise<void> => {
     </div>
 
     <!-- 新建周期对话框 -->
-    <el-dialog v-model="createVisible" title="新建周期" width="520px" destroy-on-close>
+    <el-dialog v-model="createVisible" title="新建周期" width="560px" destroy-on-close>
       <el-form :model="createForm" label-width="110px">
+        <el-form-item label="考核表类型" required>
+          <el-select v-model="createForm.periodType" style="width: 100%">
+            <el-option-group v-for="line in ['个人', '部门']" :key="line" :label="line + '考核线'">
+              <el-option
+                v-for="t in PERIOD_TYPES.filter((x) => x.line === line)"
+                :key="t.code"
+                :value="t.code"
+                :label="t.label + (t.annual ? '（年度）' : '')"
+              />
+            </el-option-group>
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="selectedType" label="导入格式">
+          <el-alert type="info" :closable="false" show-icon :title="selectedType.importFormat" style="width: 100%" />
+        </el-form-item>
         <el-form-item label="名称" required>
           <el-input v-model="createForm.name" placeholder="如 2026 年第一季度" maxlength="64" />
         </el-form-item>
         <el-form-item label="年份" required>
           <el-input-number v-model="createForm.year" :min="2000" :max="2100" />
         </el-form-item>
-        <el-form-item label="季度" required>
+        <el-form-item v-if="!selectedType?.annual" label="季度" required>
           <el-select v-model="createForm.quarter">
             <el-option :value="1" label="第一季度" />
             <el-option :value="2" label="第二季度" />
@@ -269,47 +333,77 @@ const handleClose = async (row: PeriodResp): Promise<void> => {
       </template>
     </el-dialog>
 
-    <!-- 开启周期：员工勾选对话框 -->
-    <el-dialog v-model="openVisible" title="选择参与考核的员工" width="640px" destroy-on-close>
+    <!-- 开启周期对话框 -->
+    <el-dialog
+      v-model="openVisible"
+      :title="isDeptLine ? '选择参与考核的部门' : '选择参与考核的人员'"
+      width="640px"
+      destroy-on-close
+    >
       <el-alert
         type="info"
         :closable="false"
         show-icon
-        title="仅勾选的员工需要填写该周期考核表；未勾选的不参与。也可通过 Excel 一次性导入员工与考核明细。"
+        :title="
+          isDeptLine
+            ? '仅勾选的部门需要参与该部门考核；未勾选的不参与。开启后由部门绩效专员填报 KPI。'
+            : '仅勾选的被考核人需要填写该周期考核表；未勾选的不参与。也可通过 Excel 一次性导入。'
+        "
         style="margin-bottom: 12px"
       />
-      <el-upload
-        :show-file-list="false"
-        :auto-upload="false"
-        accept=".xlsx,.xls"
-        :on-change="(file: any) => onImportFile(file.raw)"
-        style="margin-bottom: 12px"
-      >
-        <el-button :loading="importLoading" plain>导入 Excel（员工+考核明细）</el-button>
-        <template #tip>
-          <div class="el-upload__tip" style="line-height: 1.6">
-            Excel 格式：A 列为员工登录名（每员工 10 行首行标注），B-G 列为序号/指标类别/指标名称/指标分数/工作目标/评分标准。
-            导入后自动勾选对应员工并写入考核明细。
-          </div>
-        </template>
-      </el-upload>
+
+      <!-- 个人线：导入 + 用户勾选 -->
+      <template v-if="!isDeptLine">
+        <el-upload
+          :show-file-list="false"
+          :auto-upload="false"
+          accept=".xlsx,.xls"
+          :on-change="(file: any) => onImportFile(file.raw)"
+          style="margin-bottom: 12px"
+        >
+          <el-button :loading="importLoading" plain>导入 Excel（员工+考核明细）</el-button>
+          <template #tip>
+            <div class="el-upload__tip" style="line-height: 1.6">
+              {{ getPeriodType(openTarget?.periodType)?.importFormat }}
+            </div>
+          </template>
+        </el-upload>
+        <el-table
+          ref="empTableRef"
+          v-loading="empLoading"
+          :data="empOptions"
+          border
+          stripe
+          max-height="360"
+          @selection-change="(rows: UserResp[]) => { selectedIds = rows.map((r) => r.id) }"
+        >
+          <el-table-column type="selection" width="50" />
+          <el-table-column prop="realName" label="姓名" min-width="110" />
+          <el-table-column prop="username" label="登录名" min-width="110" />
+          <el-table-column label="部门" min-width="130">
+            <template #default="{ row }">{{ row.deptName || '—' }}</template>
+          </el-table-column>
+          <el-table-column label="角色" width="130">
+            <template #default="{ row }">{{ RoleLabel[row.role as keyof typeof RoleLabel] ?? row.role }}</template>
+          </el-table-column>
+        </el-table>
+      </template>
+
+      <!-- 部门线：部门勾选 -->
       <el-table
-        ref="empTableRef"
-        v-loading="empLoading"
-        :data="empOptions"
+        v-else
+        ref="deptTableRef"
+        v-loading="deptLoading"
+        :data="deptOptions"
         border
         stripe
         max-height="360"
-        @selection-change="(rows: UserResp[]) => { selectedIds = rows.map((r) => r.id) }"
+        @selection-change="(rows: DeptResp[]) => { selectedDeptIds = rows.map((r) => r.id) }"
       >
         <el-table-column type="selection" width="50" />
-        <el-table-column prop="realName" label="姓名" min-width="110" />
-        <el-table-column prop="username" label="登录名" min-width="110" />
-        <el-table-column label="部门" min-width="130">
-          <template #default="{ row }">{{ row.deptName || '—' }}</template>
-        </el-table-column>
-        <el-table-column label="角色" width="120">
-          <template #default="{ row }">{{ roleLabel(row.role) }}</template>
+        <el-table-column prop="name" label="部门名称" min-width="180" />
+        <el-table-column label="备注" min-width="200">
+          <template #default="{ row }">{{ row.remark || '—' }}</template>
         </el-table-column>
       </el-table>
       <template #footer>
@@ -317,10 +411,10 @@ const handleClose = async (row: PeriodResp): Promise<void> => {
         <el-button
           type="primary"
           :loading="openSaving"
-          :disabled="selectedIds.length === 0"
+          :disabled="isDeptLine ? selectedDeptIds.length === 0 : selectedIds.length === 0"
           @click="submitOpen"
         >
-          确认开启（{{ selectedIds.length }}）
+          确认开启（{{ isDeptLine ? selectedDeptIds.length : selectedIds.length }}）
         </el-button>
       </template>
     </el-dialog>

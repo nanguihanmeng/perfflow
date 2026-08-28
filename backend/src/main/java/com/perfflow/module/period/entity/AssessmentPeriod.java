@@ -18,6 +18,8 @@ public class AssessmentPeriod implements Serializable {
     @TableId(type = IdType.AUTO)
     private Long id;
     private String name;
+    /** 周期类型：{@link com.perfflow.module.period.enums.PeriodType}，默认 QUARTER_ASSESS */
+    private String periodType;
     private Integer year;
     private Integer quarter;
     private LocalDate startDate;

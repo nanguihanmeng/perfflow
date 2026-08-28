@@ -42,6 +42,9 @@ public class AssessmentImportService {
     /**
      * 导入考核明细到指定主表。
      *
+     * <p>校验：全部 10 行指标分数必须非空、无 0 分，且绝对值之和 = 100；
+     * 加减分项（BONUS）指标分数为负数，其余为正数，负数不参与绝对值求和（绝对值只计正数行）。
+     *
      * @param tableId 主表ID
      * @param bytes   xlsx 文件字节
      */
@@ -66,6 +69,9 @@ public class AssessmentImportService {
         try (ExcelReader reader = ExcelUtil.getReader(new ByteArrayInputStream(bytes))) {
             // 从第 5 行开始读取 10 行，列下标与模板一致（0 起）：
             // B=1 序号, C=2 指标类别, D=3 指标名称, E=4 指标分数, F=5 工作目标, G=6 评分标准
+            BigDecimal absSum = BigDecimal.ZERO;
+            boolean hasZero = false;
+            boolean hasMissing = false;
             for (int i = 0; i < DATA_ROW_COUNT; i++) {
                 int excelRow = DATA_START_ROW + i;
                 AssessmentRow r = rows.get(i);
@@ -92,6 +98,15 @@ public class AssessmentImportService {
                                     + r.getSeq() + ")不一致");
                 }
 
+                // 指标分数校验：必填、不得为 0；正数行计入总分（绝对值之和），负数行视为加减分项不计入
+                if (baseScore == null) {
+                    hasMissing = true;
+                } else if (baseScore.compareTo(BigDecimal.ZERO) == 0) {
+                    hasZero = true;
+                } else if (baseScore.compareTo(BigDecimal.ZERO) > 0) {
+                    absSum = absSum.add(baseScore);
+                }
+
                 r.setIndicatorName(indicatorName);
                 r.setWorkTarget(workTarget);
                 r.setScoreCriteria(scoreCriteria);
@@ -99,6 +114,18 @@ public class AssessmentImportService {
                     r.setBaseScore(baseScore);
                 }
                 rowMapper.updateById(r);
+            }
+            if (hasMissing) {
+                throw new BizException(ResultCode.BAD_REQUEST,
+                        "指标分数存在空值，请确保序号 1-10 每行均填写指标分数");
+            }
+            if (hasZero) {
+                throw new BizException(ResultCode.BAD_REQUEST,
+                        "指标分数不能为 0，请填写正数或负数的实际分值");
+            }
+            if (absSum.compareTo(BigDecimal.valueOf(100)) != 0) {
+                throw new BizException(ResultCode.BAD_REQUEST,
+                        "指标分数（正数）之和须等于 100，当前为 " + absSum.stripTrailingZeros().toPlainString());
             }
             log.info("import rows for table {}: {} rows", tableId, DATA_ROW_COUNT);
         } catch (BizException e) {

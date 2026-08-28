@@ -26,11 +26,14 @@ public class AssessmentCalcService {
 
     /**
      * 计算单行 self_score = base_score * completion_rate / 100（保留 2 位小数）。
+     *
+     * <p>指标分数为负数（加减分项）时得分按 0 处理：负数指标分数仅在部门领导
+     * 调整「自评得分」时作为减分录入，默认不得自动计为负分。
      */
     public static BigDecimal calcSelfScore(BigDecimal baseScore, BigDecimal completionRate) {
         if (baseScore == null || completionRate == null) return null;
-        BigDecimal r = baseScore.multiply(completionRate).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
-        return r.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal score = baseScore.multiply(completionRate).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
+        return score.setScale(2, RoundingMode.HALF_UP);
     }
 
     /**
@@ -79,8 +82,8 @@ public class AssessmentCalcService {
                         .orderByAsc("seq"));
         for (AssessmentRow r : rows) {
             if (RowCategory.BONUS.name().equals(r.getCategory())) {
-                // 加减分项：得分 = 指标分数（加减分清单由公司/HR 确定，不乘完成率）
-                r.setSelfScore(r.getBaseScore() == null ? BigDecimal.ZERO : r.getBaseScore());
+                // 加减分项：默认得分 0（指标分数为负数时不得自动计为负分；正数加分项需由部门领导在审核时确认为自评得分）
+                r.setSelfScore(BigDecimal.ZERO);
             } else {
                 r.setSelfScore(calcSelfScore(r.getBaseScore(), r.getCompletionRate()));
             }

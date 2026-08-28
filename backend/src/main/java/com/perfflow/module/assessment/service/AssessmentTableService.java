@@ -41,6 +41,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AssessmentTableService {
 
+    /** 参与个人考核的被考核人角色（排除 ADMIN / PERFORMANCE_HR） */
+    private static final List<String> ASSESSED_ROLES = List.of(
+            RoleConst.ROLE_EMP, RoleConst.ROLE_DEPT_LEAD, RoleConst.ROLE_LEAD,
+            RoleConst.ROLE_DEPT_STAFF, RoleConst.ROLE_OPERATION, RoleConst.ROLE_COMMITTEE);
+
     private final AssessmentTableMapper tableMapper;
     private final AssessmentRowMapper rowMapper;
     private final AssessmentFlowLogMapper flowLogMapper;
@@ -145,8 +150,9 @@ public class AssessmentTableService {
     @Transactional
     public void submit(Long tableId) {
         AssessmentTable t = getRequired(tableId);
-        // 仅本人 + 1 状态
-        if (!perm.isEmp() || !DataScopeContext.currentUserId().equals(t.getUserId())) {
+        // 被考核人本人提交（EMP/部门领导/领导/专员/运营/委员），排除 HR/ADMIN
+        if (!DataScopeContext.currentUserId().equals(t.getUserId())
+                || !ASSESSED_ROLES.contains(perm.currentRole())) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
         stateMachine.assertInState(t, AssessmentState.SELF_DRAFTING);
@@ -198,19 +204,22 @@ public class AssessmentTableService {
             throw new BizException(ResultCode.FORBIDDEN);
         }
         stateMachine.assertInState(t, AssessmentState.SELF_SUSPENDED);
+        // 无部门（如公司领导）跳过部门审核，直接进入领导评分阶段
+        AssessmentState target = t.getDeptId() == null ? AssessmentState.LEAD_SCORING : AssessmentState.DEPT_REVIEW;
+        String action = target == AssessmentState.LEAD_SCORING ? "PUSH_DIRECT" : "PUSH";
         // 原子条件更新：仅当仍处于 SELF_SUSPENDED 才流转，防并发重复推送
         int updated = tableMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<AssessmentTable>()
                 .eq(AssessmentTable::getId, tableId)
                 .eq(AssessmentTable::getState, AssessmentState.SELF_SUSPENDED.name())
-                .set(AssessmentTable::getState, AssessmentState.DEPT_REVIEW.name())
+                .set(AssessmentTable::getState, target.name())
                 .set(AssessmentTable::getPushedAt, LocalDateTime.now()));
         if (updated == 0) {
             throw new BizException(ResultCode.STATE_NOT_ALLOWED, "考核表状态已变化，请刷新后重试");
         }
-        t.setState(AssessmentState.DEPT_REVIEW.name());
+        t.setState(target.name());
         t.setPushedAt(LocalDateTime.now());
-        flowService.writeLog(t, AssessmentState.SELF_SUSPENDED, AssessmentState.DEPT_REVIEW, "PUSH");
-        log.info("人事推送考核表: tableId={}", tableId);
+        flowService.writeLog(t, AssessmentState.SELF_SUSPENDED, target, action);
+        log.info("人事推送考核表: tableId={}, 目标状态={}", tableId, target);
     }
 
     @Transactional
@@ -274,8 +283,21 @@ public class AssessmentTableService {
             throw new BizException(ResultCode.SCORE_OUT_OF_RANGE);
         }
         AssessmentTable t = getRequired(tableId);
-        if (!perm.isLead()) {
+        // 评分人规则：LEAD 评非 LEAD 的表；LEAD 自己的表由绩效委员会评分
+        boolean selfIsLead = t.getUserId().equals(DataScopeContext.currentUserId())
+                && RoleConst.ROLE_LEAD.equals(perm.currentRole());
+        if (selfIsLead) {
+            throw new BizException(ResultCode.FORBIDDEN, "领导不能给自己评分，由绩效委员会评分");
+        }
+        if (!perm.isLead() && !RoleConst.ROLE_COMMITTEE.equals(perm.currentRole())) {
             throw new BizException(ResultCode.FORBIDDEN);
+        }
+        if (RoleConst.ROLE_COMMITTEE.equals(perm.currentRole())) {
+            // 委员会只能评 LEAD（公司领导）的表
+            SysUser target = userMapper.selectById(t.getUserId());
+            if (target == null || !RoleConst.ROLE_LEAD.equals(target.getRole())) {
+                throw new BizException(ResultCode.FORBIDDEN, "绩效委员会仅可评分公司领导的考核表");
+            }
         }
         stateMachine.assertInState(t, AssessmentState.LEAD_SCORING);
         // 原子条件更新：仅当仍处于 LEAD_SCORING 才流转
@@ -347,25 +369,26 @@ public class AssessmentTableService {
     }
 
     /**
-     * 为指定员工生成考核主表 + 10 行模板。
+     * 为指定被考核人生成考核主表 + 10 行模板。
      *
-     * <p>userIds 为空时兼容旧逻辑：为所有参与考核的启用员工生成。
-     * 仅 EMP 参与考核；HR / ADMIN / LEAD / DEPT_LEAD 均不生成考核表。
+     * <p>被考核人角色：EMP / DEPT_LEAD / LEAD / DEPT_STAFF / OPERATION / COMMITTEE
+     * （排除 ADMIN / PERFORMANCE_HR）。部门级角色（领导/运营/委员等）无部门时可建表，
+     * 走"跳过部门审核、直接领导评分"流程。
      *
      * @param period  考核周期
-     * @param userIds 参与考核的员工 ID 列表，为空表示全员
+     * @param userIds 参与考核的被考核人 ID 列表，为空表示全部可参与角色
      */
     @Transactional
     public void initForPeriod(AssessmentPeriod period, List<Long> userIds) {
         QueryWrapper<SysUser> qw = new QueryWrapper<SysUser>()
-                .eq("role", RoleConst.ROLE_EMP)
+                .in("role", ASSESSED_ROLES)
                 .eq("status", 1);
         if (userIds != null && !userIds.isEmpty()) {
             qw.in("id", userIds);
         }
         List<SysUser> users = userMapper.selectList(qw);
         for (SysUser u : users) {
-            if (u.getDeptId() == null) continue;
+            // 参与考核但无部门（如领导）允许建表；不参与考核的角色（ADMIN/HR）不在此集合
             // skip existing
             AssessmentTable exists = tableMapper.selectOne(new QueryWrapper<AssessmentTable>()
                     .eq("period_id", period.getId()).eq("user_id", u.getId()));

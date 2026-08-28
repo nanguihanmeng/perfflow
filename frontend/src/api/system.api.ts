@@ -49,8 +49,9 @@ export const toggleUserStatusApi = (id: number): Promise<Result<void>> =>
 /** 部门列表 */
 export const getDeptListApi = (): Promise<Result<DeptResp[]>> => request.get<DeptResp[]>('/admin/departments')
 
-/** 参与考核的员工选项（HR 开启周期勾选用） */
-export const getUserOptionsApi = (): Promise<Result<UserResp[]>> => request.get<UserResp[]>('/users/options')
+/** 参与考核的用户选项（HR 开启个人线周期勾选用；可按角色过滤） */
+export const getUserOptionsApi = (roles?: string[]): Promise<Result<UserResp[]>> =>
+  request.get<UserResp[]>('/users/options', { params: { roles } })
 
 /** 新建部门 */
 export const createDeptApi = (data: DeptReq): Promise<Result<number>> =>

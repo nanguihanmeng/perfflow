@@ -46,7 +46,11 @@ const canPush = computed(() => role.value === Role.PERFORMANCE_HR && state.value
 const canExtend = computed(() => role.value === Role.PERFORMANCE_HR && state.value === AssessmentState.SELF_SUSPENDED)
 const canImport = computed(() => role.value === Role.PERFORMANCE_HR && state.value === AssessmentState.SELF_DRAFTING)
 const canViewLogs = computed(
-  () => role.value === Role.PERFORMANCE_HR || role.value === Role.LEAD || role.value === Role.DEPT_LEAD
+  () =>
+    role.value === Role.PERFORMANCE_HR ||
+    role.value === Role.LEAD ||
+    role.value === Role.DEPT_LEAD ||
+    role.value === Role.EMP
 )
 
 const loadTable = async (): Promise<void> => {

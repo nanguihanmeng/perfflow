@@ -46,6 +46,21 @@ public enum ResultCode {
     SCORE_OUT_OF_RANGE(2021, "分数必须在 0-100 之间"),
     EXTEND_OVER_LIMIT(2030, "累计延长挂起天数已达上限（30 天）"),
 
+    // ---- 2040：部门考核 ----
+    DEPT_ASSESS_NOT_FOUND(2040, "部门考核表不存在"),
+    DEPT_ASSESS_ALREADY_SUBMITTED(2041, "部门考核已提交，不可重复提交"),
+    DEPT_KPI_REQUIRED(2042, "请完整填写 KPI 指标"),
+
+    // ---- 2050：等级配额 ----
+    GRADE_QUOTA_NOT_FOUND(2050, "未找到等级配额配置"),
+    GRADE_QUOTA_EXISTS(2051, "该部门等级与员工层级的配额配置已存在"),
+
+    // ---- 2060：权重配置 ----
+    WEIGHT_CONFIG_NOT_FOUND(2060, "未找到权重配置"),
+
+    // ---- 2070：监控看板 ----
+    REMIND_TARGET_REQUIRED(2070, "催办对象不能为空"),
+
     // ---- 3000：系统 ----
     INTERNAL_ERROR(3000, "系统开小差，请稍后再试");
 

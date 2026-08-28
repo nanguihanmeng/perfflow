@@ -32,6 +32,7 @@ public class SysUserService {
     private final SysDepartmentMapper deptMapper;
     private final PasswordEncoder passwordEncoder;
 
+    /** 默认初始密码（与 sql/perfflow.sql 种子一致；生产环境应改为环境变量注入） */
     private static final String DEFAULT_PWD = "12345678";
 
     public Page<UserResp> page(String username, String role, Long deptId, Integer status,
@@ -75,12 +76,23 @@ public class SysUserService {
      *
      * @return 员工列表
      */
-    public List<UserResp> listOptions() {
+    /**
+     * 参与考核的用户选项（HR 开启个人线周期勾选用）。
+     *
+     * <p>默认排除 ADMIN / PERFORMANCE_HR；可按角色过滤（对应周期类型 participantRoles）。
+     *
+     * @param roles 角色编码集合，为空表示全部（仍排除 ADMIN/HR）
+     * @return 用户选项列表
+     */
+    public List<UserResp> listOptions(List<String> roles) {
         QueryWrapper<SysUser> qw = new QueryWrapper<SysUser>()
                 .ne("role", RoleConst.ROLE_ADMIN)
                 .ne("role", RoleConst.ROLE_PERFORMANCE_HR)
                 .eq("status", 1)
                 .orderByAsc("id");
+        if (roles != null && !roles.isEmpty()) {
+            qw.in("role", roles);
+        }
         List<SysUser> users = userMapper.selectList(qw);
         Map<Long, String> cache = new HashMap<>();
         List<UserResp> out = new ArrayList<>(users.size());

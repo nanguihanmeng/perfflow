@@ -91,8 +91,8 @@ public class AssessmentTableController {
     }
 
     @PostMapping("/{id}/lead-score")
-    @Operation(summary = "领导评分（LEAD_SCORING -> FINISHED）")
-    @PreAuthorize("hasRole('LEAD')")
+    @Operation(summary = "领导评分（LEAD_SCORING -> FINISHED；LEAD 的表由绩效委员会评分）")
+    @PreAuthorize("hasAnyRole('LEAD','COMMITTEE')")
     public Result<Void> leadScore(@PathVariable Long id,
                                   @Valid @RequestBody LeadScoreReq req) {
         service.leadScore(id, req.getLeaderScore(), req.getComment());

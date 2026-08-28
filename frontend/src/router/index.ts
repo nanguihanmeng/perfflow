@@ -103,6 +103,36 @@ export const routes: RouteRecordRaw[] = [
         name: 'DeptManage',
         component: () => import('@/views/admin/DeptManage.vue'),
         meta: { title: '部门管理', roles: [Role.ADMIN] }
+      },
+      {
+        path: 'dept-staff/assessment',
+        name: 'DeptStaffAssessment',
+        component: () => import('@/views/dept-staff/DeptAssessment.vue'),
+        meta: { title: '部门考核填报', roles: [Role.DEPT_STAFF], adminDenied: true }
+      },
+      {
+        path: 'operation/dashboard',
+        name: 'OperationDashboard',
+        component: () => import('@/views/operation/Dashboard.vue'),
+        meta: { title: '进度看板', roles: [Role.OPERATION, Role.COMMITTEE], adminDenied: true }
+      },
+      {
+        path: 'operation/dept-audit',
+        name: 'OperationDeptAudit',
+        component: () => import('@/views/operation/DeptAudit.vue'),
+        meta: { title: '部门考核初审', roles: [Role.OPERATION], adminDenied: true }
+      },
+      {
+        path: 'committee/approve',
+        name: 'CommitteeApprove',
+        component: () => import('@/views/committee/DeptApprove.vue'),
+        meta: { title: '部门考核审批', roles: [Role.COMMITTEE], adminDenied: true }
+      },
+      {
+        path: 'notifications',
+        name: 'Notifications',
+        component: () => import('@/views/notification/Notifications.vue'),
+        meta: { title: '我的通知', roles: [Role.EMP, Role.DEPT_LEAD, Role.LEAD, Role.PERFORMANCE_HR, Role.DEPT_STAFF, Role.OPERATION, Role.COMMITTEE], adminDenied: true }
       }
     ]
   },

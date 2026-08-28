@@ -62,6 +62,8 @@ export interface ProfileReq {
 export interface PeriodResp {
   id: number
   name: string
+  periodType: string
+  periodTypeLabel: string
   year: number
   quarter: number
   startDate: string
@@ -74,6 +76,7 @@ export interface PeriodResp {
 
 export interface PeriodCreateReq {
   name: string
+  periodType: string
   year: number
   quarter: number
   startDate: string
@@ -238,4 +241,131 @@ export interface DeptReq {
   name: string
   parentId?: number | null
   remark?: string | null
+}
+
+/* ------------------------- 部门考核 /dept-assessments ------------------------- */
+
+/** 部门 KPI 行 */
+export interface DeptKpiRowResp {
+  id: number
+  deptAssessmentId: number
+  rowType: string
+  seqNo: number
+  indicatorName: string | null
+  targetValue: string | null
+  actualValue: string | null
+  scoringStandard: string | null
+  score: string | null
+  weight: string | null
+}
+
+/** 部门 KPI 行请求 */
+export interface DeptKpiRowReq {
+  rowType: string
+  seqNo: number
+  indicatorName?: string | null
+  targetValue?: string | null
+  actualValue?: string | null
+  scoringStandard?: string | null
+  score?: string | null
+  weight?: string | null
+}
+
+/** 部门考核响应 */
+export interface DeptAssessmentResp {
+  id: number
+  periodId: number
+  deptId: number
+  deptName: string | null
+  kpiScore: string | null
+  operationScore: string | null
+  keyWorkScore: string | null
+  bonusScore: string | null
+  totalScore: string | null
+  deptGrade: string | null
+  status: number
+  submittedAt: string | null
+  reviewedAt: string | null
+  approvedAt: string | null
+  version: number
+  adjustReason: string | null
+  rows: DeptKpiRowResp[]
+}
+
+/** 部门考核填报请求 */
+export interface DeptAssessmentReq {
+  deptId: number
+  rows: DeptKpiRowReq[]
+}
+
+/* ------------------------- 进度看板 /monitor ------------------------- */
+
+export interface DeptProgressResp {
+  deptId: number
+  deptName: string
+  total: number
+  filled: number
+  unfilled: number
+  reviewed: number
+  overdue: number
+  completionRate: number
+}
+
+export interface ProgressResp {
+  total: number
+  filled: number
+  unfilled: number
+  reviewed: number
+  overdue: number
+  deptDetails: DeptProgressResp[]
+}
+
+/* ------------------------- 通知 /notifications ------------------------- */
+
+export interface NotificationItem {
+  id: number
+  targetUserId: number
+  title: string
+  content: string | null
+  type: string
+  readFlag: boolean
+  createdAt: string
+}
+
+/* ------------------------- 等级配额 / 权重 /grade ------------------------- */
+
+export interface GradeQuotaConfig {
+  id: number
+  deptGrade: string
+  staffLevel: string
+  gradeARatio: string
+  gradeBRatio: string
+  gradeCRatio: string
+  gradeDRatio: string
+  isDefault: boolean
+}
+
+export interface GradeQuotaReq {
+  deptGrade: string
+  staffLevel: string
+  gradeARatio: string
+  gradeBRatio: string
+  gradeCRatio: string
+  gradeDRatio: string
+  isDefault?: boolean
+}
+
+export interface WeightConfig {
+  id: number
+  staffLevel: string
+  deptWeight: string
+  personalWeight: string
+  periodId: number | null
+}
+
+export interface WeightConfigReq {
+  staffLevel: string
+  deptWeight: string
+  personalWeight: string
+  periodId?: number | null
 }

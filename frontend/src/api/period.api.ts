@@ -16,9 +16,12 @@ export const getCurrentPeriodApi = (): Promise<Result<PeriodResp | null>> =>
 export const createPeriodApi = (data: PeriodCreateReq): Promise<Result<number>> =>
   request.post<number>('/periods', data)
 
-/** 开启周期（生成勾选员工考核表；userIds 为空则全员） */
-export const openPeriodApi = (id: number, userIds?: number[]): Promise<Result<void>> =>
-  request.post<void>(`/periods/${id}/open`, userIds && userIds.length > 0 ? { userIds } : {})
+/** 开启周期（个人线传 userIds，部门线传 deptIds；为空则全员/全部部门） */
+export const openPeriodApi = (id: number, userIds?: number[], deptIds?: number[]): Promise<Result<void>> =>
+  request.post<void>(`/periods/${id}/open`, {
+    ...(userIds && userIds.length > 0 ? { userIds } : {}),
+    ...(deptIds && deptIds.length > 0 ? { deptIds } : {})
+  })
 
 /** 导入周期考核明细（员工+明细一个文件，返回参与员工ID） */
 export const importPeriodApi = (id: number, file: File): Promise<Result<number[]>> => {

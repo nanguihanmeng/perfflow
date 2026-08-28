@@ -9,7 +9,10 @@ export const RoleLabel: Record<RoleType, string> = {
   [Role.DEPT_LEAD]: '部门领导',
   [Role.LEAD]: '公司领导',
   [Role.PERFORMANCE_HR]: '绩效考核管理员',
-  [Role.ADMIN]: '系统管理员'
+  [Role.ADMIN]: '系统管理员',
+  [Role.DEPT_STAFF]: '部门绩效专员',
+  [Role.OPERATION]: '运营管理部',
+  [Role.COMMITTEE]: '绩效委员会'
 }
 
 /** 是否为管理员 */

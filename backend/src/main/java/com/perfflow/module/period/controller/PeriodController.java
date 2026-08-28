@@ -47,11 +47,11 @@ public class PeriodController {
     }
 
     @PostMapping("/{id}/open")
-    @Operation(summary = "开启周期（生成勾选员工考核表，不传 userIds 则为全员）")
+    @Operation(summary = "开启周期（个人类传 userIds，部门类传 deptIds；不传则全员/全部部门）")
     @PreAuthorize("hasRole('PERFORMANCE_HR')")
     public Result<Void> open(@PathVariable Long id,
                              @RequestBody(required = false) PeriodOpenReq req) {
-        periodService.open(id, req == null ? null : req.getUserIds());
+        periodService.open(id, req == null ? null : req.getUserIds(), req == null ? null : req.getDeptIds());
         return Result.ok();
     }
 

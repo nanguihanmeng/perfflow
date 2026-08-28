@@ -21,11 +21,10 @@ export const getMeApi = (): Promise<Result<CurrentUserSnapshot>> =>
 export const logoutApi = (): Promise<Result<void>> => request.post<void>('/auth/logout')
 
 /**
- * 用户改密（预留接口）
- * 前端仅提交新密码；后端实现后按此契约联调（错误码 1105/1106）
+ * 用户改密：成功后返回新令牌（mustChangePassword=false），前端直接覆盖本地登录态，无需重新登录
  */
-export const changePasswordApi = (data: ChangePasswordReq): Promise<Result<void>> =>
-  request.put<void>('/auth/password', data, { silent: true })
+export const changePasswordApi = (data: ChangePasswordReq): Promise<Result<LoginResp>> =>
+  request.put<LoginResp>('/auth/password', data, { silent: true })
 
 /** 修改个人资料（姓名/邮箱/电话） */
 export const updateProfileApi = (data: ProfileReq): Promise<Result<void>> =>

@@ -1,0 +1,72 @@
+package com.perfflow.module.grade.service;
+
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.perfflow.common.api.ResultCode;
+import com.perfflow.common.exception.BizException;
+import com.perfflow.module.grade.dto.WeightConfigReq;
+import com.perfflow.module.grade.entity.WeightConfig;
+import com.perfflow.module.grade.mapper.WeightConfigMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+/**
+ * 权重配置服务（管理员维护）。
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class WeightConfigService {
+
+    private final WeightConfigMapper weightMapper;
+
+    /**
+     * 权重配置列表。
+     *
+     * @return 全部配置
+     */
+    public List<WeightConfig> list() {
+        return weightMapper.selectList(new QueryWrapper<WeightConfig>().orderByAsc("staff_level"));
+    }
+
+    /**
+     * 新增权重配置。
+     *
+     * @param req 配置请求
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Long create(WeightConfigReq req) {
+        WeightConfig config = new WeightConfig();
+        config.setStaffLevel(req.getStaffLevel());
+        config.setDeptWeight(req.getDeptWeight());
+        config.setPersonalWeight(req.getPersonalWeight());
+        config.setPeriodId(req.getPeriodId());
+        weightMapper.insert(config);
+        log.info("新增权重配置: staffLevel={}, deptWeight={}, personalWeight={}",
+                req.getStaffLevel(), req.getDeptWeight(), req.getPersonalWeight());
+        return config.getId();
+    }
+
+    /**
+     * 更新权重配置。
+     *
+     * @param id  配置ID
+     * @param req 配置请求
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void update(Long id, WeightConfigReq req) {
+        WeightConfig config = weightMapper.selectById(id);
+        if (config == null) {
+            throw new BizException(ResultCode.WEIGHT_CONFIG_NOT_FOUND);
+        }
+        config.setStaffLevel(req.getStaffLevel());
+        config.setDeptWeight(req.getDeptWeight());
+        config.setPersonalWeight(req.getPersonalWeight());
+        config.setPeriodId(req.getPeriodId());
+        weightMapper.updateById(config);
+        log.info("更新权重配置: id={}", id);
+    }
+}

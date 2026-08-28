@@ -1,16 +1,15 @@
 <script setup lang="ts">
 /**
- * 修改密码页
- * 说明：不校验旧密码，仅确认两次新密码一致（首次登录强制改密场景）。
- * 后端暂无改密接口，提交走预留契约 PUT /auth/password（错误码 1105/1106）。
- * 后端未实现时调用失败，前端优雅提示，不阻塞其余功能。
+ * 修改密码页（首次登录强制改密场景）
+ * 说明：不校验旧密码，仅确认两次新密码一致。改密成功后后端返回新令牌，
+ * 前端直接覆盖本地令牌并进入工作台，无需重新登录（原 JWT 中 mustChangePwd=true 已被拒绝）。
  */
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'element-plus'
 import { changePasswordApi } from '@/api/auth.api'
 import { useAuthStore } from '@/store/auth'
-import { toastSuccess, toastWarning } from '@/utils/message'
+import { toastSuccess, toastError } from '@/utils/message'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -49,13 +48,13 @@ const handleSubmit = async (): Promise<void> => {
   }
   loading.value = true
   try {
-    // 预留接口：后端未实现时此处会抛错，由 catch 统一提示
-    await changePasswordApi({ newPassword: form.newPassword })
-    toastSuccess('密码修改成功，请重新登录')
-    await authStore.logout()
-    router.push('/login')
+    // 后端返回新令牌（mustChangePassword=false），直接覆盖本地登录态
+    const res = await changePasswordApi({ newPassword: form.newPassword })
+    authStore.setLogin(res.data)
+    toastSuccess('密码修改成功')
+    router.push('/home')
   } catch {
-    toastWarning('改密接口尚未就绪，请稍后重试或联系管理员')
+    toastError('密码修改失败，请稍后重试')
   } finally {
     loading.value = false
   }

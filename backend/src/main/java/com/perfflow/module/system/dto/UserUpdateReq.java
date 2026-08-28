@@ -9,7 +9,7 @@ import java.io.Serializable;
 public class UserUpdateReq implements Serializable {
 
     private String realName;
-    @Pattern(regexp = "EMP|DEPT_LEAD|LEAD|ADMIN")
+    @Pattern(regexp = "EMP|DEPT_LEAD|LEAD|ADMIN|DEPT_STAFF|OPERATION|COMMITTEE")
     private String role;
     private Long deptId;
     private String email;

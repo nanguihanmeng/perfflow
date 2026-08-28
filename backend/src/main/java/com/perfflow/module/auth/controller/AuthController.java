@@ -43,11 +43,10 @@ public class AuthController {
     }
 
     @PutMapping("/password")
-    @Operation(summary = "修改密码（登录后可调用）")
+    @Operation(summary = "修改密码（登录后可调用，返回新令牌，改密后免重新登录）")
     @PreAuthorize("isAuthenticated()")
-    public Result<Void> changePassword(@Valid @RequestBody ChangePasswordReq req) {
-        authService.changePassword(req.getNewPassword());
-        return Result.ok();
+    public Result<LoginResp> changePassword(@Valid @RequestBody ChangePasswordReq req) {
+        return Result.ok(authService.changePassword(req.getNewPassword()));
     }
 
     @PutMapping("/profile")
