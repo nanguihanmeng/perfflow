@@ -25,3 +25,6 @@ replay_pid*
 
 # ZCode workspace
 .zcode/
+
+# 工作文档，不入库
+docs/
