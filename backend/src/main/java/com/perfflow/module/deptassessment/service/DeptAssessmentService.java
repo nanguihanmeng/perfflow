@@ -5,9 +5,10 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.perfflow.common.api.ResultCode;
 import com.perfflow.common.constant.RoleConst;
 import com.perfflow.common.exception.BizException;
-import com.perfflow.module.deptassessment.dto.DeptAssessmentReq;
+import com.perfflow.module.deptassessment.dto.DeptActualValueReq;
+import com.perfflow.module.deptassessment.dto.DeptActualValueRowReq;
+import com.perfflow.module.deptassessment.dto.DeptAssessmentOptionResp;
 import com.perfflow.module.deptassessment.dto.DeptAssessmentResp;
-import com.perfflow.module.deptassessment.dto.DeptKpiRowReq;
 import com.perfflow.module.deptassessment.dto.DeptKpiRowResp;
 import com.perfflow.module.deptassessment.entity.DeptAssessment;
 import com.perfflow.module.deptassessment.entity.DeptKpiRow;
@@ -15,6 +16,7 @@ import com.perfflow.module.deptassessment.enums.DeptAssessmentState;
 import com.perfflow.module.deptassessment.mapper.DeptAssessmentMapper;
 import com.perfflow.module.deptassessment.mapper.DeptKpiRowMapper;
 import com.perfflow.module.period.entity.AssessmentPeriod;
+import com.perfflow.module.period.enums.PeriodType;
 import com.perfflow.module.period.mapper.AssessmentPeriodMapper;
 import com.perfflow.module.system.entity.SysDepartment;
 import com.perfflow.module.system.mapper.SysDepartmentMapper;
@@ -25,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,6 +37,7 @@ import java.util.List;
  * 部门考核服务：KPI 填报、复核、初审、审批、部门等级自动计算。
  *
  * <p>状态流转采用"原子条件更新 + updated==0 抛错"范式，防止并发重复流转。
+ * <p>填报仅允许绩效专员维护"实际完成值"；得分由系统按完成率自动计算，不对外编辑。
  */
 @Slf4j
 @Service
@@ -49,6 +53,18 @@ public class DeptAssessmentService {
     private static final int KPI_ROW_COUNT = 3;
     private static final int OPERATION_ROW_COUNT = 2;
     private static final int KEY_WORK_ROW_COUNT = 2;
+
+    /** 周期状态：进行中（HR 已开启） */
+    private static final int PERIOD_STATUS_OPEN = 1;
+
+    /** 完成率上限（超额完成按 100% 计） */
+    private static final BigDecimal RATIO_CAP = BigDecimal.ONE;
+
+    /** 完成率除法保留小数位数 */
+    private static final int RATIO_SCALE = 4;
+
+    /** 得分保留小数位数 */
+    private static final int SCORE_SCALE = 2;
 
     private final DeptAssessmentMapper deptAssessmentMapper;
     private final DeptKpiRowMapper kpiRowMapper;
@@ -77,12 +93,7 @@ public class DeptAssessmentService {
             if (d.getId() == null) {
                 continue;
             }
-            DeptAssessment exists = deptAssessmentMapper.selectOne(
-                    new QueryWrapper<DeptAssessment>()
-                            .eq("period_id", period.getId())
-                            .eq("dept_id", d.getId())
-                            .last("LIMIT 1"));
-            if (exists != null) {
+            if (findAssessment(period.getId(), d.getId()) != null) {
                 continue;
             }
             initAssessment(period.getId(), d.getId());
@@ -92,49 +103,66 @@ public class DeptAssessmentService {
     }
 
     /**
-     * 获取当前周期本部门考核表（不存在则初始化）。
+     * 查询本部门可填报的部门考核选项（仅 HR 已开启的部门线周期）。
+     *
+     * <p>HR 未开启部门考核、或本部门未被勾选参与时返回空列表，前端展示"暂未开启部门填报"。
      *
      * @param deptId 部门ID
-     * @return 部门考核响应
+     * @return 填报选项列表（按周期年/季度倒序）
      */
-    @Transactional(rollbackFor = Exception.class)
-    public DeptAssessmentResp current(Long deptId) {
-        AssessmentPeriod period = requiredActivePeriod();
-        DeptAssessment assessment = deptAssessmentMapper.selectOne(
-                new QueryWrapper<DeptAssessment>()
-                        .eq("period_id", period.getId())
-                        .eq("dept_id", deptId)
-                        .last("LIMIT 1"));
-        if (assessment == null) {
-            assessment = initAssessment(period.getId(), deptId);
+    public List<DeptAssessmentOptionResp> listOptions(Long deptId) {
+        List<AssessmentPeriod> periods = periodMapper.selectList(new QueryWrapper<AssessmentPeriod>()
+                .eq("status", PERIOD_STATUS_OPEN)
+                .orderByDesc("year")
+                .orderByDesc("quarter"));
+        List<DeptAssessmentOptionResp> out = new ArrayList<>(periods.size());
+        for (AssessmentPeriod p : periods) {
+            if (!isDeptLinePeriod(p)) {
+                continue;
+            }
+            DeptAssessment assessment = findAssessment(p.getId(), deptId);
+            if (assessment == null) {
+                continue;
+            }
+            out.add(toOptionResp(p, assessment));
         }
+        return out;
+    }
+
+    /**
+     * 按主表ID查询部门考核详情（含 KPI 行）。
+     *
+     * <p>数据范围：部门绩效专员/部门负责人仅可见本部门；运营/委员会/绩效管理员可见全部。
+     *
+     * @param id 部门考核主表ID
+     * @return 部门考核详情
+     */
+    public DeptAssessmentResp getById(Long id) {
+        DeptAssessment assessment = requiredById(id);
+        assertViewPermission(assessment.getDeptId());
         return toResp(assessment);
     }
 
     /**
-     * 部门绩效专员填报/提交本部门 KPI（自评中 → 待复核）。
+     * 部门绩效专员提交本部门 KPI 实际完成值（自评中 → 待复核）。
      *
-     * @param deptId 部门ID
-     * @param req    填报请求
+     * <p>仅允许修改 actualValue，其余字段（指标/目标值/评分标准/权重/得分）不可由专员维护；
+     * 得分在提交时由系统按完成率自动重算。
+     *
+     * @param assessmentId 部门考核主表ID
+     * @param req          填报请求
      */
     @Transactional(rollbackFor = Exception.class)
-    public void submit(Long deptId, DeptAssessmentReq req) {
-        assertDeptStaff(deptId);
-        AssessmentPeriod period = requiredActivePeriod();
-        DeptAssessment assessment = deptAssessmentMapper.selectOne(
-                new QueryWrapper<DeptAssessment>()
-                        .eq("period_id", period.getId())
-                        .eq("dept_id", deptId)
-                        .last("LIMIT 1"));
-        if (assessment == null) {
-            assessment = initAssessment(period.getId(), deptId);
-        }
+    public void submit(Long assessmentId, DeptActualValueReq req) {
+        DeptAssessment assessment = requiredById(assessmentId);
+        assertDeptStaff(assessment.getDeptId());
+        requireOpenPeriod(assessment.getPeriodId());
         stateMachine.assertInState(assessment, DeptAssessmentState.SELF_FILLING);
 
-        // 保存 KPI 行
-        saveRows(assessment.getId(), req.getRows());
+        // 仅保存实际完成值，得分自动计算
+        saveActualValues(assessment.getId(), req.getRows());
+        recalcScores(assessment.getId());
 
-        // 原子条件更新：仅当仍处于自评中才流转
         int updated = deptAssessmentMapper.update(null, new LambdaUpdateWrapper<DeptAssessment>()
                 .eq(DeptAssessment::getId, assessment.getId())
                 .eq(DeptAssessment::getStatus, DeptAssessmentState.SELF_FILLING.getCode())
@@ -144,21 +172,21 @@ public class DeptAssessmentService {
         if (updated == 0) {
             throw new BizException(ResultCode.STATE_NOT_ALLOWED, "部门考核状态已变化，请刷新后重试");
         }
-        log.info("部门绩效专员提交部门考核: deptId={}, periodId={}", deptId, period.getId());
+        log.info("部门绩效专员提交部门考核: assessmentId={}, deptId={}", assessmentId, assessment.getDeptId());
     }
 
     /**
      * 部门负责人复核（待复核 → 待初审 / 退回自评中）。
      *
-     * @param deptId  部门ID
-     * @param approve 是否通过
-     * @param comment 意见/原因
+     * @param assessmentId 部门考核主表ID
+     * @param approve      是否通过
+     * @param comment      意见/原因
      */
     @Transactional(rollbackFor = Exception.class)
-    public void review(Long deptId, boolean approve, String comment) {
-        assertDeptLead(deptId);
-        AssessmentPeriod period = requiredActivePeriod();
-        DeptAssessment assessment = requiredByPeriodDept(period.getId(), deptId);
+    public void review(Long assessmentId, boolean approve, String comment) {
+        DeptAssessment assessment = requiredById(assessmentId);
+        assertDeptLead(assessment.getDeptId());
+        requireOpenPeriod(assessment.getPeriodId());
         stateMachine.assertInState(assessment, DeptAssessmentState.PENDING_REVIEW);
 
         if (!approve) {
@@ -173,21 +201,21 @@ public class DeptAssessmentService {
         if (updated == 0) {
             throw new BizException(ResultCode.STATE_NOT_ALLOWED, "部门考核状态已变化，请刷新后重试");
         }
-        log.info("部门负责人复核通过: deptId={}, periodId={}", deptId, period.getId());
+        log.info("部门负责人复核通过: assessmentId={}, deptId={}", assessmentId, assessment.getDeptId());
     }
 
     /**
      * 运营管理部初审（待初审 → 待审批 / 退回整改）。
      *
-     * @param deptId  部门ID
-     * @param approve 是否通过
-     * @param comment 意见/原因
+     * @param assessmentId 部门考核主表ID
+     * @param approve      是否通过
+     * @param comment      意见/原因
      */
     @Transactional(rollbackFor = Exception.class)
-    public void audit(Long deptId, boolean approve, String comment) {
+    public void audit(Long assessmentId, boolean approve, String comment) {
         assertOperation();
-        AssessmentPeriod period = requiredActivePeriod();
-        DeptAssessment assessment = requiredByPeriodDept(period.getId(), deptId);
+        DeptAssessment assessment = requiredById(assessmentId);
+        requireOpenPeriod(assessment.getPeriodId());
         stateMachine.assertInState(assessment, DeptAssessmentState.PENDING_AUDIT);
 
         if (!approve) {
@@ -201,22 +229,23 @@ public class DeptAssessmentService {
         if (updated == 0) {
             throw new BizException(ResultCode.STATE_NOT_ALLOWED, "部门考核状态已变化，请刷新后重试");
         }
-        log.info("运营管理部初审通过: deptId={}, periodId={}", deptId, period.getId());
+        log.info("运营管理部初审通过: assessmentId={}, deptId={}", assessmentId, assessment.getDeptId());
     }
 
     /**
      * 绩效委员会最终审批（待审批 → 已完成，触发部门等级计算）。
      *
-     * @param deptId 部门ID
+     * @param assessmentId 部门考核主表ID
      */
     @Transactional(rollbackFor = Exception.class)
-    public void approve(Long deptId) {
+    public void approve(Long assessmentId) {
         assertCommittee();
-        AssessmentPeriod period = requiredActivePeriod();
-        DeptAssessment assessment = requiredByPeriodDept(period.getId(), deptId);
+        DeptAssessment assessment = requiredById(assessmentId);
+        requireOpenPeriod(assessment.getPeriodId());
         stateMachine.assertInState(assessment, DeptAssessmentState.PENDING_APPROVE);
 
-        // 计算部门总分与等级
+        // 审批前重算得分，确保与最新实际完成值一致
+        recalcScores(assessment.getId());
         BigDecimal total = calcTotalScore(assessment.getId());
         String grade = gradeOf(total);
 
@@ -230,14 +259,14 @@ public class DeptAssessmentService {
         if (updated == 0) {
             throw new BizException(ResultCode.STATE_NOT_ALLOWED, "部门考核状态已变化，请刷新后重试");
         }
-        log.info("绩效委员会审批完成: deptId={}, periodId={}, totalScore={}, grade={}",
-                deptId, period.getId(), total, grade);
+        log.info("绩效委员会审批完成: assessmentId={}, deptId={}, totalScore={}, grade={}",
+                assessmentId, assessment.getDeptId(), total, grade);
     }
 
     /**
-     * 部门考核进度列表（运营管理部/委员会/管理员看板用）。
+     * 部门考核进度列表（运营管理部/委员会/绩效管理员看板用）。
      *
-     * <p>数据范围：部门绩效专员/部门负责人仅见本部门；运营/委员会/管理员见全部。
+     * <p>数据范围：部门绩效专员/部门负责人仅见本部门；运营/委员会/绩效管理员见全部。
      *
      * @return 部门考核列表（含部门名）
      */
@@ -246,12 +275,10 @@ public class DeptAssessmentService {
         String role = DataScopeContext.current().getPrimaryRole();
         if (RoleConst.ROLE_DEPT_STAFF.equals(role) || RoleConst.ROLE_DEPT_LEAD.equals(role)) {
             Long deptId = DataScopeContext.currentDeptId();
-            if (deptId != null) {
-                qw.eq("dept_id", deptId);
-            } else {
-                // 无部门归属时返回空
+            if (deptId == null) {
                 return Collections.emptyList();
             }
+            qw.eq("dept_id", deptId);
         }
         qw.orderByDesc("id");
         List<DeptAssessment> list = deptAssessmentMapper.selectList(qw);
@@ -260,6 +287,32 @@ public class DeptAssessmentService {
             out.add(toResp(d));
         }
         return out;
+    }
+
+    /**
+     * 计算单行得分：得分 = min(实际完成值/目标值, 1) × 权重，保留 2 位小数。
+     *
+     * <p>目标值或实际值为非数字的定性指标、目标值缺失、权重缺失时按 0 分计入。
+     *
+     * @param targetValue 目标值（Excel 导入，可为非数字）
+     * @param actualValue 实际完成值（绩效专员填报）
+     * @param weight      权重（0-100，百分比）
+     * @return 自动计算得分
+     */
+    static BigDecimal calcRowScore(String targetValue, String actualValue, BigDecimal weight) {
+        if (weight == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal target = toDecimal(targetValue);
+        BigDecimal actual = toDecimal(actualValue);
+        if (target == null || actual == null || target.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal ratio = actual.divide(target, RATIO_SCALE, RoundingMode.HALF_UP);
+        if (ratio.compareTo(RATIO_CAP) > 0) {
+            ratio = RATIO_CAP;
+        }
+        return ratio.multiply(weight).setScale(SCORE_SCALE, RoundingMode.HALF_UP);
     }
 
     // ==================== 内部方法 ====================
@@ -300,33 +353,34 @@ public class DeptAssessmentService {
         kpiRowMapper.insert(row);
     }
 
-    /** 保存 KPI 行（按 dept_assessment_id + seq_no 覆盖写，幂等；行类型以模板为准，不随请求覆盖） */
-    private void saveRows(Long assessmentId, List<DeptKpiRowReq> rows) {
+    /** 仅保存实际完成值，其余字段保持模板/HR 导入的内容不变 */
+    private void saveActualValues(Long assessmentId, List<DeptActualValueRowReq> rows) {
         if (rows == null || rows.isEmpty()) {
             return;
         }
-        for (DeptKpiRowReq req : rows) {
-            DeptKpiRow row = kpiRowMapper.selectOne(new QueryWrapper<DeptKpiRow>()
-                    .eq("dept_assessment_id", assessmentId)
-                    .eq("seq_no", req.getSeqNo())
-                    .last("LIMIT 1"));
-            if (row == null) {
-                row = new DeptKpiRow();
-                row.setDeptAssessmentId(assessmentId);
-                row.setSeqNo(req.getSeqNo());
-                row.setRowType(req.getRowType());
+        for (DeptActualValueRowReq req : rows) {
+            if (req.getSeqNo() == null) {
+                continue;
             }
-            row.setIndicatorName(req.getIndicatorName());
-            row.setTargetValue(req.getTargetValue());
-            row.setActualValue(req.getActualValue());
-            row.setScoringStandard(req.getScoringStandard());
-            row.setScore(req.getScore());
-            row.setWeight(req.getWeight());
-            if (row.getId() == null) {
-                kpiRowMapper.insert(row);
-            } else {
-                kpiRowMapper.updateById(row);
+            int updated = kpiRowMapper.update(null, new LambdaUpdateWrapper<DeptKpiRow>()
+                    .eq(DeptKpiRow::getDeptAssessmentId, assessmentId)
+                    .eq(DeptKpiRow::getSeqNo, req.getSeqNo())
+                    .set(DeptKpiRow::getActualValue, req.getActualValue()));
+            if (updated == 0) {
+                throw new BizException(ResultCode.BAD_REQUEST, "KPI 行不存在，请刷新后重试");
             }
+        }
+    }
+
+    /** 按完成率重算全部行的得分并落库 */
+    private void recalcScores(Long assessmentId) {
+        List<DeptKpiRow> rows = kpiRowMapper.selectList(
+                new QueryWrapper<DeptKpiRow>().eq("dept_assessment_id", assessmentId));
+        for (DeptKpiRow row : rows) {
+            BigDecimal score = calcRowScore(row.getTargetValue(), row.getActualValue(), row.getWeight());
+            kpiRowMapper.update(null, new LambdaUpdateWrapper<DeptKpiRow>()
+                    .eq(DeptKpiRow::getId, row.getId())
+                    .set(DeptKpiRow::getScore, score));
         }
     }
 
@@ -340,7 +394,7 @@ public class DeptAssessmentService {
         if (updated == 0) {
             throw new BizException(ResultCode.STATE_NOT_ALLOWED, "部门考核状态已变化，请刷新后重试");
         }
-        log.info("{}: deptId={}, comment={}", action, assessment.getDeptId(), comment);
+        log.info("{}: assessmentId={}, comment={}", action, assessment.getId(), comment);
     }
 
     /** 计算部门总分 = KPI + 运营 + 重点工作 + 加减分（按行得分求和） */
@@ -385,26 +439,28 @@ public class DeptAssessmentService {
         return "D";
     }
 
-    /** 当前活跃周期（未结束），不存在抛业务异常 */
-    private AssessmentPeriod requiredActivePeriod() {
-        AssessmentPeriod period = periodMapper.selectOne(new QueryWrapper<AssessmentPeriod>()
-                .orderByDesc("year").orderByDesc("quarter").last("LIMIT 1"));
-        if (period == null) {
-            throw new BizException(ResultCode.PERIOD_NOT_OPEN, "暂无考核周期");
+    /** 校验周期为进行中，否则抛业务异常 */
+    private AssessmentPeriod requireOpenPeriod(Long periodId) {
+        AssessmentPeriod period = periodMapper.selectById(periodId);
+        if (period == null || !Integer.valueOf(PERIOD_STATUS_OPEN).equals(period.getStatus())) {
+            throw new BizException(ResultCode.PERIOD_NOT_OPEN, "考核周期未开启或已结束");
         }
         return period;
     }
 
-    private DeptAssessment requiredByPeriodDept(Long periodId, Long deptId) {
-        DeptAssessment assessment = deptAssessmentMapper.selectOne(
-                new QueryWrapper<DeptAssessment>()
-                        .eq("period_id", periodId)
-                        .eq("dept_id", deptId)
-                        .last("LIMIT 1"));
+    private DeptAssessment requiredById(Long id) {
+        DeptAssessment assessment = deptAssessmentMapper.selectById(id);
         if (assessment == null) {
-            throw new BizException(ResultCode.NOT_FOUND, "部门考核表不存在");
+            throw new BizException(ResultCode.DEPT_ASSESS_NOT_FOUND);
         }
         return assessment;
+    }
+
+    private DeptAssessment findAssessment(Long periodId, Long deptId) {
+        return deptAssessmentMapper.selectOne(new QueryWrapper<DeptAssessment>()
+                .eq("period_id", periodId)
+                .eq("dept_id", deptId)
+                .last("LIMIT 1"));
     }
 
     /** 校验当前用户为部门绩效专员且属于指定部门 */
@@ -445,6 +501,47 @@ public class DeptAssessmentService {
         if (!RoleConst.ROLE_COMMITTEE.equals(role)) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
+    }
+
+    /** 校验查看权限：专员/负责人仅可见本部门，其余角色可见全部 */
+    private void assertViewPermission(Long deptId) {
+        String role = DataScopeContext.current().getPrimaryRole();
+        if (!RoleConst.ROLE_DEPT_STAFF.equals(role) && !RoleConst.ROLE_DEPT_LEAD.equals(role)) {
+            return;
+        }
+        Long currentDeptId = DataScopeContext.currentDeptId();
+        if (currentDeptId == null || !currentDeptId.equals(deptId)) {
+            throw new BizException(ResultCode.FORBIDDEN, "只能查看本部门考核");
+        }
+    }
+
+    private boolean isDeptLinePeriod(AssessmentPeriod period) {
+        if (period.getPeriodType() == null) {
+            return false;
+        }
+        try {
+            return PeriodType.of(period.getPeriodType()).isDeptLine();
+        } catch (IllegalArgumentException e) {
+            log.warn("未知周期类型: periodId={}, periodType={}", period.getId(), period.getPeriodType());
+            return false;
+        }
+    }
+
+    private DeptAssessmentOptionResp toOptionResp(AssessmentPeriod p, DeptAssessment a) {
+        DeptAssessmentOptionResp resp = new DeptAssessmentOptionResp();
+        resp.setAssessmentId(a.getId());
+        resp.setPeriodId(p.getId());
+        resp.setPeriodName(p.getName());
+        resp.setPeriodType(p.getPeriodType());
+        resp.setPeriodTypeLabel(PeriodType.of(p.getPeriodType()).getLabel());
+        resp.setYear(p.getYear());
+        resp.setQuarter(p.getQuarter());
+        resp.setDeptId(a.getDeptId());
+        SysDepartment dept = deptMapper.selectById(a.getDeptId());
+        resp.setDeptName(dept == null ? null : dept.getName());
+        resp.setStatus(a.getStatus());
+        resp.setSubmittedAt(a.getSubmittedAt());
+        return resp;
     }
 
     private DeptAssessmentResp toResp(DeptAssessment d) {
@@ -495,5 +592,16 @@ public class DeptAssessmentService {
             out.add(resp);
         }
         return out;
+    }
+
+    private static BigDecimal toDecimal(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return new BigDecimal(value.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

@@ -176,10 +176,13 @@ export interface FlowLogResp {
 /* ------------------------- 首页 /home ------------------------- */
 
 export interface Reminder {
+  bizType: string
   type: string
   title: string
   description: string
   targetTableId: number | null
+  targetAssessmentId: number | null
+  targetPeriodId: number | null
   severity: ReminderSeverity
 }
 
@@ -259,16 +262,30 @@ export interface DeptKpiRowResp {
   weight: string | null
 }
 
-/** 部门 KPI 行请求 */
-export interface DeptKpiRowReq {
-  rowType: string
+/** 部门 KPI 行实际完成值请求 */
+export interface DeptActualValueRowReq {
   seqNo: number
-  indicatorName?: string | null
-  targetValue?: string | null
-  actualValue?: string | null
-  scoringStandard?: string | null
-  score?: string | null
-  weight?: string | null
+  actualValue: string | null
+}
+
+/** 部门考核填报请求（绩效专员仅提交实际完成值） */
+export interface DeptActualValueReq {
+  rows: DeptActualValueRowReq[]
+}
+
+/** 部门考核填报选项（绩效专员先选择再填报） */
+export interface DeptAssessmentOptionResp {
+  assessmentId: number
+  periodId: number
+  periodName: string
+  periodType: string
+  periodTypeLabel: string
+  year: number
+  quarter: number
+  deptId: number
+  deptName: string | null
+  status: number
+  submittedAt: string | null
 }
 
 /** 部门考核响应 */
@@ -290,12 +307,6 @@ export interface DeptAssessmentResp {
   version: number
   adjustReason: string | null
   rows: DeptKpiRowResp[]
-}
-
-/** 部门考核填报请求 */
-export interface DeptAssessmentReq {
-  deptId: number
-  rows: DeptKpiRowReq[]
 }
 
 /* ------------------------- 进度看板 /monitor ------------------------- */

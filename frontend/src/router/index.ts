@@ -111,6 +111,18 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: '部门考核填报', roles: [Role.DEPT_STAFF], adminDenied: true }
       },
       {
+        path: 'dept/dept-review',
+        name: 'DeptAssessmentReview',
+        component: () => import('@/views/dept-lead/DeptAssessmentReview.vue'),
+        meta: { title: '部门考核复核', roles: [Role.DEPT_LEAD], adminDenied: true }
+      },
+      {
+        path: 'hr/dept-assessments',
+        name: 'DeptAssessmentManage',
+        component: () => import('@/views/hr/DeptAssessmentManage.vue'),
+        meta: { title: '部门考核管理', roles: [Role.PERFORMANCE_HR], adminDenied: true }
+      },
+      {
         path: 'operation/dashboard',
         name: 'OperationDashboard',
         component: () => import('@/views/operation/Dashboard.vue'),

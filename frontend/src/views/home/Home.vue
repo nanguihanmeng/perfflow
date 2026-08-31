@@ -63,7 +63,7 @@ const severityType = (severity: number): 'info' | 'warning' | 'danger' => {
   return 'info'
 }
 
-/** 各角色允许跳转的考核表详情路径（白名单，避免拼接任意路径） */
+/** 各角色允许跳转的个人考核表详情路径（白名单，避免拼接任意路径） */
 const detailPathByRole: Record<string, string> = {
   [Role.PERFORMANCE_HR]: '/hr/table/',
   [Role.DEPT_LEAD]: '/dept/review/',
@@ -71,12 +71,43 @@ const detailPathByRole: Record<string, string> = {
   [Role.EMP]: '/me/assessment/'
 }
 
+/** 部门考核相关角色跳转路径（配合 targetAssessmentId） */
+const deptPathByRole: Record<string, string> = {
+  [Role.DEPT_STAFF]: '/dept-staff/assessment?assessmentId=',
+  [Role.DEPT_LEAD]: '/dept/dept-review?assessmentId=',
+  [Role.OPERATION]: '/operation/dept-audit?assessmentId=',
+  [Role.COMMITTEE]: '/committee/approve?assessmentId='
+}
+
+/** 挂起预警按周期跳转（HR/部门负责人查看对应周期考核列表） */
+const suspendPathByRole: Record<string, string> = {
+  [Role.PERFORMANCE_HR]: '/hr/list?periodId=',
+  [Role.DEPT_LEAD]: '/dept/review?periodId='
+}
+
 const goToTarget = (reminder: Reminder): void => {
-  // targetTableId 必须为正整数（后端 DB 主键），非白名单角色不跳转
+  const role = authStore.role ?? ''
+  // 部门考核待办：按 targetAssessmentId 跳转到各角色对应页面
+  if (reminder.bizType === 'DEPT' && reminder.targetAssessmentId != null && reminder.targetAssessmentId > 0) {
+    const base = deptPathByRole[role]
+    if (base) {
+      router.push(`${base}${reminder.targetAssessmentId}`)
+    }
+    return
+  }
+  // 挂起预警：按 targetPeriodId 跳转到周期相关列表
+  if (reminder.bizType === 'SUSPEND_SOON' && reminder.targetPeriodId != null && reminder.targetPeriodId > 0) {
+    const base = suspendPathByRole[role]
+    if (base) {
+      router.push(`${base}${reminder.targetPeriodId}`)
+    }
+    return
+  }
+  // 个人考核待办：targetTableId 必须为正整数（后端 DB 主键），非白名单角色不跳转
   if (reminder.targetTableId == null || !Number.isInteger(reminder.targetTableId) || reminder.targetTableId <= 0) {
     return
   }
-  const base = detailPathByRole[authStore.role ?? '']
+  const base = detailPathByRole[role]
   if (base) {
     router.push(`${base}${reminder.targetTableId}`)
   }

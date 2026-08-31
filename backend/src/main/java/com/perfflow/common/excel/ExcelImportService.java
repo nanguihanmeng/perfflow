@@ -7,8 +7,12 @@ import com.perfflow.common.api.ResultCode;
 import com.perfflow.common.exception.BizException;
 import com.perfflow.module.assessment.entity.AssessmentRow;
 import com.perfflow.module.assessment.mapper.AssessmentRowMapper;
+import com.perfflow.module.deptassessment.entity.DeptAssessment;
 import com.perfflow.module.deptassessment.entity.DeptKpiRow;
+import com.perfflow.module.deptassessment.enums.DeptAssessmentState;
+import com.perfflow.module.deptassessment.mapper.DeptAssessmentMapper;
 import com.perfflow.module.deptassessment.mapper.DeptKpiRowMapper;
+import com.perfflow.module.deptassessment.service.DeptAssessmentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,7 +25,8 @@ import java.math.BigDecimal;
  * Excel 数据导入服务（个人考核 / 部门考核）。
  *
  * <p>个人导入：列 = 序号/指标类别/指标名称/指标分数/工作目标/评分标准/完成率/自评得分，按 table_id+seq 覆盖写。
- * <p>部门导入：列 = 行类型/序号/指标名称/目标值/实际完成值/评分标准/得分/权重，按 dept_assessment_id+seq_no 覆盖写。
+ * <p>部门导入（绩效考核管理员维护指标）：列 = 行类型/序号/指标名称/目标值/评分标准/权重，按 dept_assessment_id+seq_no 覆盖写；
+ * 得分由系统按完成率自动计算，实际完成值由绩效专员在页面填报，均不在 HR 导入中维护。
  */
 @Slf4j
 @Service
@@ -33,6 +38,7 @@ public class ExcelImportService {
 
     private final AssessmentRowMapper assessmentRowMapper;
     private final DeptKpiRowMapper deptKpiRowMapper;
+    private final DeptAssessmentMapper deptAssessmentMapper;
 
     /**
      * 导入个人考核数据（按 tableId + seq 覆盖写行）。
@@ -79,7 +85,10 @@ public class ExcelImportService {
     }
 
     /**
-     * 导入部门考核数据（按 assessmentId + seqNo 覆盖写行）。
+     * 导入部门考核指标（按 assessmentId + seqNo 覆盖写行）。
+     *
+     * <p>仅自评中（填报中）的部门考核可导入；只写入指标名称/目标值/评分标准/权重，
+     * 实际完成值保留绩效专员填报内容，得分由系统按完成率自动计算。
      *
      * @param assessmentId 部门考核主表ID
      * @param bytes        xlsx 字节
@@ -87,6 +96,13 @@ public class ExcelImportService {
     @Transactional(rollbackFor = Exception.class)
     public void importDept(Long assessmentId, byte[] bytes) {
         assertFile(bytes);
+        DeptAssessment assessment = deptAssessmentMapper.selectById(assessmentId);
+        if (assessment == null) {
+            throw new BizException(ResultCode.DEPT_ASSESS_NOT_FOUND);
+        }
+        if (!Integer.valueOf(DeptAssessmentState.SELF_FILLING.getCode()).equals(assessment.getStatus())) {
+            throw new BizException(ResultCode.STATE_NOT_ALLOWED, "仅填报中的部门考核可导入指标");
+        }
         try (ExcelReader reader = ExcelUtil.getReader(new ByteArrayInputStream(bytes))) {
             int lastRow = reader.getRowCount();
             for (int row = 1; row < lastRow; row++) {
@@ -104,20 +120,18 @@ public class ExcelImportService {
                     target.setDeptAssessmentId(assessmentId);
                     target.setSeqNo(seqNo);
                 }
-                target.setRowType(rowType == null ? "经营业绩" : rowType);
+                target.setRowType(rowType == null ? DeptAssessmentService.ROW_TYPE_KPI : rowType);
                 target.setIndicatorName(cellStr(reader, 2, row));
                 target.setTargetValue(cellStr(reader, 3, row));
-                target.setActualValue(cellStr(reader, 4, row));
-                target.setScoringStandard(cellStr(reader, 5, row));
-                target.setScore(toBigDecimal(reader.readCellValue(6, row)));
-                target.setWeight(toBigDecimal(reader.readCellValue(7, row)));
+                target.setScoringStandard(cellStr(reader, 4, row));
+                target.setWeight(toBigDecimal(reader.readCellValue(5, row)));
                 if (target.getId() == null) {
                     deptKpiRowMapper.insert(target);
                 } else {
                     deptKpiRowMapper.updateById(target);
                 }
             }
-            log.info("部门考核导入完成: assessmentId={}", assessmentId);
+            log.info("部门考核指标导入完成: assessmentId={}", assessmentId);
         } catch (BizException e) {
             throw e;
         } catch (Exception e) {

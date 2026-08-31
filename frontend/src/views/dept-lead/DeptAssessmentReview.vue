@@ -1,10 +1,10 @@
 <script setup lang="ts">
 /**
- * 部门考核初审（OPERATION）：展示全部状态部门考核，仅"待初审"可审核/退回整改
+ * 部门考核复核（DEPT_LEAD）：本部门考核列表，待复核可"通过/退回+意见"，其余状态只读
  */
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { auditDeptAssessmentApi, listDeptAssessmentApi } from '@/api/dept.api'
+import { listDeptAssessmentApi, reviewDeptAssessmentApi } from '@/api/dept.api'
 import type { DeptAssessmentResp } from '@/types/dto'
 import { confirmAction, toastSuccess } from '@/utils/message'
 import { ElMessageBox } from 'element-plus'
@@ -13,7 +13,6 @@ import PageHeader from '@/components/common/PageHeader.vue'
 const route = useRoute()
 const loading = ref(false)
 const list = ref<DeptAssessmentResp[]>([])
-const statusFilter = ref<number | null>(null)
 const detailVisible = ref(false)
 const detail = ref<DeptAssessmentResp | null>(null)
 
@@ -23,13 +22,6 @@ const statusLabel = (status: number): string => {
   }
   return map[status] ?? String(status)
 }
-
-const filtered = computed(() => {
-  if (statusFilter.value == null) {
-    return list.value
-  }
-  return list.value.filter((d) => d.status === statusFilter.value)
-})
 
 const load = async (): Promise<void> => {
   loading.value = true
@@ -59,48 +51,39 @@ const showDetail = (row: DeptAssessmentResp): void => {
   detailVisible.value = true
 }
 
-const handleAudit = async (row: DeptAssessmentResp, approve: boolean): Promise<void> => {
+const handleReview = async (row: DeptAssessmentResp, approve: boolean): Promise<void> => {
   let comment = ''
   if (approve) {
-    await confirmAction(`确认初审通过「${row.deptName}」的部门考核？`)
+    await confirmAction(`确认复核通过「${row.deptName}」的部门考核？`)
   } else {
-    const result = await ElMessageBox.prompt('请输入整改意见', '退回部门考核整改', {
-      inputValidator: (value: string) => (value && value.trim() ? true : '整改意见不能为空')
+    const result = await ElMessageBox.prompt('请输入退回原因', '退回部门考核', {
+      inputValidator: (value: string) => (value && value.trim() ? true : '退回原因不能为空')
     })
     comment = result.value.trim()
     await confirmAction(`确认退回「${row.deptName}」的部门考核整改？`)
   }
-  await auditDeptAssessmentApi(row.id, approve, approve ? '初审通过' : comment)
-  toastSuccess(approve ? '初审通过' : '已退回')
+  await reviewDeptAssessmentApi(row.id, approve, approve ? '复核通过' : comment)
+  toastSuccess(approve ? '复核通过' : '已退回')
   detailVisible.value = false
   await load()
 }
 </script>
 
 <template>
-  <div class="dept-audit page-container">
-    <PageHeader title="部门考核初审" description="运营管理部对部门考核逐项审核" />
+  <div class="dept-review page-container">
+    <PageHeader title="部门考核复核" description="复核本部门绩效专员提交的部门考核，可退回补充填报" />
 
     <div class="card">
-      <div class="dept-audit__filter">
-        <el-select v-model="statusFilter" placeholder="全部状态" clearable style="width: 160px">
-          <el-option label="自评中" :value="1" />
-          <el-option label="待复核" :value="2" />
-          <el-option label="待初审" :value="3" />
-          <el-option label="待审批" :value="4" />
-          <el-option label="已完成" :value="5" />
-        </el-select>
-      </div>
-      <el-table v-loading="loading" :data="filtered" border stripe>
+      <el-table v-loading="loading" :data="list" border stripe>
         <el-table-column prop="deptName" label="部门" min-width="130" />
         <el-table-column label="周期" min-width="140">
           <template #default="{ row }">{{ row.periodId ? `周期#${row.periodId}` : '—' }}</template>
         </el-table-column>
-        <el-table-column prop="totalScore" label="总分" width="90" align="center">
-          <template #default="{ row }">{{ row.totalScore ?? '—' }}</template>
-        </el-table-column>
         <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">{{ statusLabel(row.status) }}</template>
+        </el-table-column>
+        <el-table-column prop="totalScore" label="总分" width="90" align="center">
+          <template #default="{ row }">{{ row.totalScore ?? '—' }}</template>
         </el-table-column>
         <el-table-column label="提交时间" width="170" align="center">
           <template #default="{ row }">{{ row.submittedAt ?? '—' }}</template>
@@ -108,14 +91,14 @@ const handleAudit = async (row: DeptAssessmentResp, approve: boolean): Promise<v
         <el-table-column label="操作" width="180" align="center" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="showDetail(row as DeptAssessmentResp)">明细</el-button>
-            <template v-if="(row as DeptAssessmentResp).status === 3">
-              <el-button link type="success" size="small" @click="handleAudit(row as DeptAssessmentResp, true)">通过</el-button>
-              <el-button link type="danger" size="small" @click="handleAudit(row as DeptAssessmentResp, false)">退回</el-button>
+            <template v-if="(row as DeptAssessmentResp).status === 2">
+              <el-button link type="success" size="small" @click="handleReview(row as DeptAssessmentResp, true)">通过</el-button>
+              <el-button link type="danger" size="small" @click="handleReview(row as DeptAssessmentResp, false)">退回</el-button>
             </template>
           </template>
         </el-table-column>
       </el-table>
-      <el-empty v-if="!loading && filtered.length === 0" description="暂无部门考核数据" />
+      <el-empty v-if="!loading && list.length === 0" description="暂无本部门部门考核数据" />
     </div>
 
     <el-dialog v-model="detailVisible" title="部门考核明细" width="860px">
@@ -154,10 +137,6 @@ const handleAudit = async (row: DeptAssessmentResp, approve: boolean): Promise<v
 </template>
 
 <style scoped lang="scss">
-.dept-audit__filter {
-  margin-bottom: 16px;
-}
-
 .dept-detail-summary {
   display: flex;
   gap: 24px;

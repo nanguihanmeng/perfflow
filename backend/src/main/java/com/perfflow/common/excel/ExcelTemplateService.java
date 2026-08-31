@@ -16,8 +16,8 @@ public class ExcelTemplateService {
 
     /** 个人考核填报模板列头 */
     private static final String[] PERSONAL_HEADERS = {"序号", "指标类别", "指标名称", "指标分数", "工作目标", "评分标准", "完成率", "自评得分"};
-    /** 部门考核填报模板列头 */
-    private static final String[] DEPT_HEADERS = {"行类型", "序号", "指标名称", "目标值", "实际完成值", "评分标准", "得分", "权重(%)"};
+    /** 部门考核填报模板列头（得分由系统按完成率自动计算，实际完成值由绩效专员填报，均不在 HR 模板中维护） */
+    private static final String[] DEPT_HEADERS = {"行类型", "序号", "指标名称", "目标值", "评分标准", "权重(%)"};
 
     /**
      * 导出个人考核填报模板。

@@ -54,7 +54,8 @@ public class ExcelController {
     }
 
     @PostMapping("/import/dept")
-    @Operation(summary = "导入部门考核数据")
+    @Operation(summary = "导入部门考核指标（绩效考核管理员）")
+    @PreAuthorize("hasRole('PERFORMANCE_HR')")
     public Result<Void> importDept(@RequestParam Long assessmentId,
                                    @RequestParam("file") MultipartFile file) throws IOException {
         importService.importDept(assessmentId, file.getBytes());

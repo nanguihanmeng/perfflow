@@ -17,10 +17,19 @@ public class RemindersResp implements Serializable {
 
     @Data
     public static class Reminder implements Serializable {
-        private String type;       // SELF_DRAFTING / SUSPEND_SOON / LEAD_SCORING ...
+        /** 业务类型：PERSONAL=个人考核 / DEPT=部门考核 / SUSPEND_SOON=挂起预警 */
+        private String bizType;
+        /** 状态/类型编码：SELF_DRAFTING / DEPT_1 / SUSPEND_SOON ... */
+        private String type;
         private String title;
         private String description;
-        private Long   targetTableId;
-        private Integer severity;  // 1=info, 2=warn, 3=urgent
+        /** 个人考核主表ID（跳转个人考核详情用） */
+        private Long targetTableId;
+        /** 部门考核主表ID（跳转部门考核详情用） */
+        private Long targetAssessmentId;
+        /** 周期ID */
+        private Long targetPeriodId;
+        /** 1=info, 2=warn, 3=urgent */
+        private Integer severity;
     }
 }
