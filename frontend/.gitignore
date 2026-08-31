@@ -6,3 +6,5 @@ dist-ssr
 logs
 *.log
 .vite
+
+.vercel
