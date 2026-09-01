@@ -95,8 +95,8 @@ const handlePrint = async (): Promise<void> => {
     <PageHeader title="考核列表" description="查看各周期员工考核情况">
       <template #actions>
         <template v-if="isHr">
-          <el-button :loading="exportLoading" :disabled="!query.periodId" @click="handleExport">导出 Excel</el-button>
-          <el-button :loading="printLoading" :disabled="!query.periodId" @click="handlePrint">打印</el-button>
+          <el-button :loading="exportLoading" @click="handleExport">导出 Excel</el-button>
+          <el-button :loading="printLoading" @click="handlePrint">打印</el-button>
         </template>
       </template>
     </PageHeader>
