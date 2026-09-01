@@ -9,6 +9,8 @@ import type { DeptAssessmentResp } from '@/types/dto'
 import { confirmAction, toastSuccess } from '@/utils/message'
 import { ElMessageBox } from 'element-plus'
 import PageHeader from '@/components/common/PageHeader.vue'
+import DeptFlowLog from '@/components/common/DeptFlowLog.vue'
+
 
 const route = useRoute()
 const loading = ref(false)
@@ -144,10 +146,10 @@ const handleAudit = async (row: DeptAssessmentResp, approve: boolean): Promise<v
           <el-table-column prop="score" label="得分" width="80" align="center">
             <template #default="{ row }">{{ row.score ?? '—' }}</template>
           </el-table-column>
-          <el-table-column prop="weight" label="权重(%)" width="90" align="center">
-            <template #default="{ row }">{{ row.weight ?? '—' }}</template>
-          </el-table-column>
         </el-table>
+        <div class="dept-detail-flow">
+          <DeptFlowLog v-if="detailVisible && detail" :assessment-id="detail.id" />
+        </div>
       </template>
     </el-dialog>
   </div>
@@ -163,5 +165,9 @@ const handleAudit = async (row: DeptAssessmentResp, approve: boolean): Promise<v
   gap: 24px;
   margin-bottom: 16px;
   font-weight: 600;
+}
+
+.dept-detail-flow {
+  margin-top: 16px;
 }
 </style>

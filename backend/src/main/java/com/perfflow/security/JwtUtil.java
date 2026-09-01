@@ -1,5 +1,4 @@
 package com.perfflow.security;
-
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.JwtException;
@@ -9,15 +8,10 @@ import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
-import java.util.List;
-
-/**
- * JWT 工具：HS256（jjwt 0.12.x API）。
- */
+// JWT 工具：HS256（jjwt 0.12.x API）。
 @Slf4j
 @Component
 public class JwtUtil {
@@ -26,7 +20,7 @@ public class JwtUtil {
     private final long accessTtl;
     private final long refreshTtl;
     private final String issuer;
-
+    // 构造器，从配置初始化密钥与有效期。
     public JwtUtil(@Value("${perfflow.jwt.secret}") String secret,
                    @Value("${perfflow.jwt.access-token-ttl-seconds}") long accessTtl,
                    @Value("${perfflow.jwt.refresh-token-ttl-seconds}") long refreshTtl,
@@ -53,17 +47,25 @@ public class JwtUtil {
         this.issuer = issuer;
     }
 
+    // 生成访问令牌。
     public String generateAccess(Long userId, String username, String role, Long deptId, Boolean deptLead,
+
                                  Boolean mustChangePwd, Integer tokenVersion) {
+
         return generate(userId, username, role, deptId, deptLead, mustChangePwd, "access", accessTtl, tokenVersion);
     }
 
+    // 生成刷新令牌。
+
     public String generateRefresh(Long userId, String username, String role, Integer tokenVersion) {
+
         return generate(userId, username, role, null, false, false, "refresh", refreshTtl, tokenVersion);
     }
 
     private String generate(Long userId, String username, String role, Long deptId, Boolean deptLead,
+
                             Boolean mustChangePwd, String type, long ttl, Integer tokenVersion) {
+
         long now = System.currentTimeMillis();
         return Jwts.builder()
                 .issuer(issuer)
@@ -81,8 +83,8 @@ public class JwtUtil {
                 .compact();
     }
 
-    /** 解析并校验 token。返回 Claims，失败抛 {@link JwtException}。 */
     public Claims parse(String token) {
+
         Jws<Claims> jws = Jwts.parser()
                 .verifyWith(key)
                 .requireIssuer(issuer)
@@ -92,8 +94,6 @@ public class JwtUtil {
     }
 
     public long getAccessTtl() { return accessTtl; }
-    public long getRefreshTtl() { return refreshTtl; }
 
-    @SuppressWarnings("unused")
-    private List<String> placeholder() { return List.of(); }
+    public long getRefreshTtl() { return refreshTtl; }
 }

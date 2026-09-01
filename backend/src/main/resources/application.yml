@@ -36,6 +36,8 @@ perfflow:
     access-token-ttl-seconds: 7200
     refresh-token-ttl-seconds: 604800
     issuer: perfflow
+  # 默认初始密码（创建用户/重置密码用）；生产环境用环境变量 PERFFLOW_DEFAULT_PWD 覆盖
+  default-pwd: ${PERFFLOW_DEFAULT_PWD:12345678}
   scheduler:
     pending-reminder-cron: "0 0 8 * * ?"
     pending-auto-push-hour: 23

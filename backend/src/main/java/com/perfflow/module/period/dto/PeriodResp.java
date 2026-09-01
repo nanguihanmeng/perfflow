@@ -1,31 +1,36 @@
 package com.perfflow.module.period.dto;
-
 import com.perfflow.module.period.entity.AssessmentPeriod;
 import com.perfflow.module.period.enums.PeriodType;
 import lombok.Data;
-
 import java.io.Serializable;
 import java.time.LocalDate;
-
 @Data
 public class PeriodResp implements Serializable {
+    // ID。
     private Long id;
+    // 名称。
     private String name;
-    /** 周期类型编码，见 {@link PeriodType} */
     private String periodType;
-    /** 周期类型中文名 */
     private String periodTypeLabel;
+    // 年份。
     private Integer year;
+    // 季度。
     private Integer quarter;
+    // 开始日期。
     private LocalDate startDate;
+    // 自评截止日期。
     private LocalDate suspendEndDate;
+    // 部门审核截止日期。
     private LocalDate deptReviewEndDate;
+    // 领导评分截止日期。
     private LocalDate leadScoreEndDate;
+    // 到期是否自动推送。
     private Boolean autoPushOnExpire;
-    /** 0=未开始 1=进行中 2=已结束 */
     private Integer status;
+    // 执行 from。
 
     public static PeriodResp from(AssessmentPeriod p) {
+
         PeriodResp r = new PeriodResp();
         r.setId(p.getId());
         r.setName(p.getName());

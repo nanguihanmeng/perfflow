@@ -1,5 +1,4 @@
 package com.perfflow.module.period.service;
-
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.perfflow.common.api.ResultCode;
 import com.perfflow.common.exception.BizException;
@@ -10,63 +9,50 @@ import com.perfflow.module.period.dto.PeriodResp;
 import com.perfflow.module.period.entity.AssessmentPeriod;
 import com.perfflow.module.period.enums.PeriodType;
 import com.perfflow.module.period.mapper.AssessmentPeriodMapper;
+import com.perfflow.task.AsyncTaskService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
-/**
- * 考核周期业务逻辑：列表、当前周期、创建、开放、关闭。
- *
- * <p>状态机：0=未开始；1=进行中；2=已结束。
- *
- * @author PerfFlow
- */
+// 考核周期业务逻辑：列表、当前周期、创建、开放、关闭。
 @Service
 @RequiredArgsConstructor
 public class AssessmentPeriodService {
 
-    /** 周期状态 - 未开始。 */
     private static final int STATUS_PENDING = 0;
-
-    /** 周期状态 - 进行中。 */
     private static final int STATUS_OPEN = 1;
-
-    /** 周期状态 - 已结束。 */
     private static final int STATUS_CLOSED = 2;
-
     private final AssessmentPeriodMapper periodMapper;
     private final AssessmentTableService tableService;
     private final DeptAssessmentService deptAssessmentService;
+    private final AsyncTaskService asyncTaskService;
 
-    /**
-     * 查询全部周期，按年/季度倒序。
-     *
-     * @return 周期响应列表
-     */
+    // 查询列表数据
     public List<PeriodResp> list() {
+
+        // 查询列表
         List<AssessmentPeriod> all = periodMapper.selectList(
                 new QueryWrapper<AssessmentPeriod>().orderByDesc("year").orderByDesc("quarter"));
+        // 构建集合容器
         List<PeriodResp> out = new ArrayList<>(all.size());
+
         for (AssessmentPeriod p : all) {
+
             out.add(PeriodResp.from(p));
         }
+
+        // 返回结果
         return out;
     }
 
-    /**
-     * 查询当前活跃周期。
-     *
-     * <p>判定：start_date ≤ today 且 today 在 (suspend_end_date OR dept_review_end_date) 之内。
-     *
-     * @param today 业务日期，传 null 时取系统当前日期
-     * @return 当前周期，未匹配返回 null
-     */
+    // 执行业务处理
     public PeriodResp current(LocalDate today) {
+
         LocalDate theDay = today == null ? LocalDate.now() : today;
         QueryWrapper<AssessmentPeriod> wrapper = new QueryWrapper<>();
         // 显式指定 lambda 参数类型为 QueryWrapper，避免泛型 Param 推导失败
@@ -77,34 +63,38 @@ public class AssessmentPeriodService {
                                 .or(w -> w.ge("dept_review_end_date", theDay))))
                 .orderByDesc("year")
                 .last("LIMIT 1");
+        // 查询单条
         AssessmentPeriod p = periodMapper.selectOne(wrapper);
         return p == null ? null : PeriodResp.from(p);
     }
 
-    /**
-     * 创建考核周期。
-     *
-     * <p>按周期类型校验：年度类型（表3/5/7）季度强制为 0；同一 年+季度+类型 唯一。
-     *
-     * @param req 创建请求
-     * @return 新周期ID
-     * @throws BizException 校验失败或已存在时抛出
-     */
     @Transactional(rollbackFor = Exception.class)
+
+    // 创建记录
     public Long create(PeriodCreateReq req) {
+
         PeriodType type = PeriodType.of(req.getPeriodType());
         Integer quarter = req.getQuarter() == null ? 0 : req.getQuarter();
+
+        // 条件分支
         if (type.isAnnual()) {
             // 年度周期无季度概念，统一按 0 存储（唯一键 year+quarter+period_type 区分年度多表）
             quarter = 0;
         }
+
+        // 统计数量
         Long exist = periodMapper.selectCount(new QueryWrapper<AssessmentPeriod>()
                 .eq("year", req.getYear())
                 .eq("quarter", quarter)
                 .eq("period_type", type.name()));
+
+        // 非空才处理
         if (exist != null && exist > 0) {
+
+            // 校验失败抛异常
             throw new BizException(ResultCode.BAD_REQUEST, "该年份该类型周期已存在");
         }
+
         AssessmentPeriod p = new AssessmentPeriod();
         p.setName(req.getName());
         p.setPeriodType(type.name());
@@ -116,61 +106,85 @@ public class AssessmentPeriodService {
         p.setLeadScoreEndDate(req.getLeadScoreEndDate());
         p.setAutoPushOnExpire(Boolean.TRUE.equals(req.getAutoPushOnExpire()));
         p.setStatus(STATUS_PENDING);
+        // 写入记录
         periodMapper.insert(p);
         return p.getId();
     }
 
-    /**
-     * 打开周期：状态置为进行中，并按类型生成考核表。
-     *
-     * <p>个人线（表1-4）：为勾选的被考核人生成个人考核主表 + 10 行模板；
-     * 部门线（表5-7）：为勾选的部门生成部门考核主表 + KPI 行模板。
-     *
-     * @param id      周期ID
-     * @param userIds 参与考核的员工 ID 列表（个人线，为空表示全员）
-     * @param deptIds 参与考核的部门 ID 列表（部门线，为空表示全部部门）
-     * @throws BizException 周期不存在或已结束时抛出
-     */
+    // 打开周期：状态置为进行中，并按类型生成考核表。
+     // 部门线（表5-7）：为勾选的部门生成部门考核主表 + KPI 行模板。
     @Transactional(rollbackFor = Exception.class)
+
+    // 执行业务处理
     public void open(Long id, List<Long> userIds, List<Long> deptIds) {
+
+        // 加载实体并校验存在
         AssessmentPeriod p = required(id);
+
+        // 状态判断
         if (Integer.valueOf(STATUS_CLOSED).equals(p.getStatus())) {
+
+            // 校验失败抛异常
             throw new BizException(ResultCode.BAD_REQUEST, "周期已结束");
         }
+
         p.setStatus(STATUS_OPEN);
+        // 更新记录
         periodMapper.updateById(p);
         PeriodType type = PeriodType.of(p.getPeriodType());
+        // 部门线同步建表；个人线在事务提交后异步建表，避免阻塞开启请求
         if (type.isDeptLine()) {
+
+            // 调用业务服务
             deptAssessmentService.initForPeriod(p, deptIds);
+
         } else {
-            tableService.initForPeriod(p, userIds);
+
+            // 注册异步建表
+            registerAsyncInit(p, userIds);
         }
     }
 
-    /**
-     * 关闭周期。
-     *
-     * @param id 周期ID
-     */
+    // 注册事务提交后的异步建表
+    private void registerAsyncInit(AssessmentPeriod p, List<Long> userIds) {
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+
+                // 异步执行
+                asyncTaskService.initPersonalTablesAsync(p, userIds);
+            }
+        });
+    }
+
     @Transactional(rollbackFor = Exception.class)
+
+    // 执行业务处理
     public void close(Long id) {
+
+        // 加载实体并校验存在
         AssessmentPeriod p = required(id);
         p.setStatus(STATUS_CLOSED);
+        // 更新记录
         periodMapper.updateById(p);
     }
 
-    /**
-     * 根据ID获取周期，不存在时抛出业务异常。
-     *
-     * @param id 周期ID
-     * @return 周期实体
-     * @throws BizException 不存在时抛出
-     */
+    // 根据ID获取周期，不存在时抛出业务异常。
+
+    // 执行业务处理
     public AssessmentPeriod required(Long id) {
+
+        // 查询单条
         AssessmentPeriod p = periodMapper.selectById(id);
+
+        // 判空处理
         if (p == null) {
+
+            // 校验失败抛异常
             throw new BizException(ResultCode.NOT_FOUND);
         }
+
         return p;
     }
 }

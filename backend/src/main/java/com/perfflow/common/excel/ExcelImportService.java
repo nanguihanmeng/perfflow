@@ -13,6 +13,10 @@ import com.perfflow.module.deptassessment.enums.DeptAssessmentState;
 import com.perfflow.module.deptassessment.mapper.DeptAssessmentMapper;
 import com.perfflow.module.deptassessment.mapper.DeptKpiRowMapper;
 import com.perfflow.module.deptassessment.service.DeptAssessmentService;
+import com.perfflow.module.period.entity.AssessmentPeriod;
+import com.perfflow.module.period.mapper.AssessmentPeriodMapper;
+import com.perfflow.module.system.entity.SysDepartment;
+import com.perfflow.module.system.mapper.SysDepartmentMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,114 +24,136 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-/**
- * Excel 数据导入服务（个人考核 / 部门考核）。
- *
- * <p>个人导入：列 = 序号/指标类别/指标名称/指标分数/工作目标/评分标准/完成率/自评得分，按 table_id+seq 覆盖写。
- * <p>部门导入（绩效考核管理员维护指标）：列 = 行类型/序号/指标名称/目标值/评分标准/权重，按 dept_assessment_id+seq_no 覆盖写；
- * 得分由系统按完成率自动计算，实际完成值由绩效专员在页面填报，均不在 HR 导入中维护。
- */
+//
+ // Excel 数据导入服务（个人考核 / 部门考核）。
+ //
+
+ // 得分由系统按完成率自动计算，实际完成值由绩效专员在页面填报，均不在 HR 导入中维护。
+ //
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ExcelImportService {
 
-    /** 文件大小上限 5MB */
+    //
     private static final long MAX_FILE_SIZE = 5 * 1024 * 1024;
 
     private final AssessmentRowMapper assessmentRowMapper;
     private final DeptKpiRowMapper deptKpiRowMapper;
     private final DeptAssessmentMapper deptAssessmentMapper;
+    private final SysDepartmentMapper deptMapper;
+    private final AssessmentPeriodMapper periodMapper;
 
-    /**
-     * 导入个人考核数据（按 tableId + seq 覆盖写行）。
-     *
-     * @param tableId 主表ID
-     * @param bytes   xlsx 字节
-     */
+    //
+     // 导入个人考核数据，按 tableId + seq 覆盖写行。
+     //
+
+     //
     @Transactional(rollbackFor = Exception.class)
     public void importPersonal(Long tableId, byte[] bytes) {
+        // 校验文件合法性
         assertFile(bytes);
         try (ExcelReader reader = ExcelUtil.getReader(new ByteArrayInputStream(bytes))) {
             int lastRow = reader.getRowCount();
             for (int row = 1; row < lastRow; row++) {
                 Integer seq = toInteger(reader.readCellValue(0, row));
+                // 判空处理
                 if (seq == null) {
                     continue;
                 }
+                // 按 主表ID+序号 定位目标行
                 AssessmentRow target = assessmentRowMapper.selectOne(new QueryWrapper<AssessmentRow>()
                         .eq("table_id", tableId)
                         .eq("seq", seq)
                         .last("LIMIT 1"));
+                // 判空处理
                 if (target == null) {
                     continue;
                 }
+                // 覆盖写指标字段
                 target.setIndicatorName(cellStr(reader, 2, row));
                 BigDecimal baseScore = toBigDecimal(reader.readCellValue(3, row));
+                // 非空才处理
                 if (baseScore != null) {
                     target.setBaseScore(baseScore);
                 }
                 target.setWorkTarget(cellStr(reader, 4, row));
                 target.setScoreCriteria(cellStr(reader, 5, row));
                 BigDecimal rate = toBigDecimal(reader.readCellValue(6, row));
+                // 非空才处理
                 if (rate != null) {
                     target.setCompletionRate(rate);
                 }
+                // 更新记录
                 assessmentRowMapper.updateById(target);
             }
             log.info("个人考核导入完成: tableId={}", tableId);
         } catch (BizException e) {
             throw e;
         } catch (Exception e) {
+            // 校验失败抛异常
             throw new BizException(ResultCode.BAD_REQUEST, "导入失败，请检查文件格式: " + e.getMessage());
         }
     }
 
-    /**
-     * 导入部门考核指标（按 assessmentId + seqNo 覆盖写行）。
-     *
-     * <p>仅自评中（填报中）的部门考核可导入；只写入指标名称/目标值/评分标准/权重，
-     * 实际完成值保留绩效专员填报内容，得分由系统按完成率自动计算。
-     *
-     * @param assessmentId 部门考核主表ID
-     * @param bytes        xlsx 字节
-     */
+    //
+     // 导入单部门考核指标，按 assessmentId + seqNo 覆盖写行。
+     //
+
+     //
+
+     //
     @Transactional(rollbackFor = Exception.class)
     public void importDept(Long assessmentId, byte[] bytes) {
         assertFile(bytes);
+        // 校验考核存在且处于自评中
         DeptAssessment assessment = deptAssessmentMapper.selectById(assessmentId);
+        // 判空处理
         if (assessment == null) {
+            // 校验失败抛异常
             throw new BizException(ResultCode.DEPT_ASSESS_NOT_FOUND);
         }
+        // 状态判断
         if (!Integer.valueOf(DeptAssessmentState.SELF_FILLING.getCode()).equals(assessment.getStatus())) {
+            // 校验失败抛异常
             throw new BizException(ResultCode.STATE_NOT_ALLOWED, "仅填报中的部门考核可导入指标");
         }
         try (ExcelReader reader = ExcelUtil.getReader(new ByteArrayInputStream(bytes))) {
             int lastRow = reader.getRowCount();
             for (int row = 1; row < lastRow; row++) {
                 Integer seqNo = toInteger(reader.readCellValue(1, row));
+                // 判空处理
                 if (seqNo == null) {
                     continue;
                 }
                 String rowType = cellStr(reader, 0, row);
+                // 按 考核主表ID+序号 定位 KPI 行
                 DeptKpiRow target = deptKpiRowMapper.selectOne(new QueryWrapper<DeptKpiRow>()
                         .eq("dept_assessment_id", assessmentId)
                         .eq("seq_no", seqNo)
                         .last("LIMIT 1"));
+                // 判空处理
                 if (target == null) {
                     target = new DeptKpiRow();
                     target.setDeptAssessmentId(assessmentId);
                     target.setSeqNo(seqNo);
                 }
+                // 仅写入指标列，实际完成值与得分不在此维护
                 target.setRowType(rowType == null ? DeptAssessmentService.ROW_TYPE_KPI : rowType);
                 target.setIndicatorName(cellStr(reader, 2, row));
                 target.setTargetValue(cellStr(reader, 3, row));
                 target.setScoringStandard(cellStr(reader, 4, row));
                 target.setWeight(toBigDecimal(reader.readCellValue(5, row)));
+                // 判空处理
                 if (target.getId() == null) {
+                    // 写入记录
                     deptKpiRowMapper.insert(target);
                 } else {
+                    // 更新记录
                     deptKpiRowMapper.updateById(target);
                 }
             }
@@ -135,25 +161,123 @@ public class ExcelImportService {
         } catch (BizException e) {
             throw e;
         } catch (Exception e) {
+            // 校验失败抛异常
             throw new BizException(ResultCode.BAD_REQUEST, "导入失败，请检查文件格式: " + e.getMessage());
         }
     }
 
+    //
+     // 按周期批量导入部门考核指标。
+     //
+
+     //
+
+     //
+    @Transactional(rollbackFor = Exception.class)
+    public void importDeptBatch(Long periodId, byte[] bytes) {
+        assertFile(bytes);
+        // 校验周期存在
+        AssessmentPeriod period = periodMapper.selectById(periodId);
+        // 判空处理
+        if (period == null) {
+            // 校验失败抛异常
+            throw new BizException(ResultCode.NOT_FOUND, "周期不存在");
+        }
+        // 建立 部门ID->部门名 映射
+        Map<Long, String> deptNames = new HashMap<>();
+        // 查询列表
+        for (SysDepartment d : deptMapper.selectList(new QueryWrapper<SysDepartment>())) {
+            deptNames.put(d.getId(), d.getName());
+        }
+        // 建立 部门名->考核主表 映射，供按名匹配
+        List<DeptAssessment> assessments = deptAssessmentMapper.selectList(
+                new QueryWrapper<DeptAssessment>().eq("period_id", periodId));
+        Map<String, DeptAssessment> byDeptName = new HashMap<>();
+        for (DeptAssessment a : assessments) {
+            String name = deptNames.get(a.getDeptId());
+            // 非空才处理
+            if (name != null) {
+                byDeptName.put(name, a);
+            }
+        }
+        try (ExcelReader reader = ExcelUtil.getReader(new ByteArrayInputStream(bytes))) {
+            int lastRow = reader.getRowCount();
+            for (int row = 1; row < lastRow; row++) {
+                String deptName = cellStr(reader, 0, row);
+                Integer seqNo = toInteger(reader.readCellValue(1, row));
+                // 判空处理
+                if (deptName == null || seqNo == null) {
+                    continue;
+                }
+                // 按部门名与序号定位考核主表
+                DeptAssessment assessment = byDeptName.get(deptName.trim());
+                // 判空处理
+                if (assessment == null) {
+                    continue;
+                }
+                // 仅自评中的考核可导入
+                if (!Integer.valueOf(DeptAssessmentState.SELF_FILLING.getCode()).equals(assessment.getStatus())) {
+                    continue;
+                }
+                // 查询单条
+                DeptKpiRow target = deptKpiRowMapper.selectOne(new QueryWrapper<DeptKpiRow>()
+                        .eq("dept_assessment_id", assessment.getId())
+                        .eq("seq_no", seqNo)
+                        .last("LIMIT 1"));
+                // 判空处理
+                if (target == null) {
+                    target = new DeptKpiRow();
+                    target.setDeptAssessmentId(assessment.getId());
+                    target.setSeqNo(seqNo);
+                }
+                // 仅写入指标列
+                target.setRowType(cellStr(reader, 2, row) == null
+                        ? DeptAssessmentService.ROW_TYPE_KPI : cellStr(reader, 2, row));
+                target.setIndicatorName(cellStr(reader, 3, row));
+                target.setTargetValue(cellStr(reader, 4, row));
+                target.setScoringStandard(cellStr(reader, 5, row));
+                target.setWeight(toBigDecimal(reader.readCellValue(6, row)));
+                // 判空处理
+                if (target.getId() == null) {
+                    // 写入记录
+                    deptKpiRowMapper.insert(target);
+                } else {
+                    // 更新记录
+                    deptKpiRowMapper.updateById(target);
+                }
+            }
+            log.info("部门考核指标批量导入完成: periodId={}", periodId);
+        } catch (BizException e) {
+            throw e;
+        } catch (Exception e) {
+            // 校验失败抛异常
+            throw new BizException(ResultCode.BAD_REQUEST, "批量导入失败，请检查文件格式: " + e.getMessage());
+        }
+    }
+
+    //
     private void assertFile(byte[] bytes) {
+        // 判空处理
         if (bytes == null || bytes.length == 0) {
+            // 校验失败抛异常
             throw new BizException(ResultCode.BAD_REQUEST, "导入文件为空");
         }
+        // 条件分支
         if (bytes.length > MAX_FILE_SIZE) {
+            // 校验失败抛异常
             throw new BizException(ResultCode.BAD_REQUEST, "导入文件过大（上限 5MB）");
         }
     }
 
+    //
     private String cellStr(ExcelReader reader, int col, int row) {
         Object v = reader.readCellValue(col, row);
         return v == null ? null : String.valueOf(v).trim();
     }
 
+    //
     private BigDecimal toBigDecimal(Object v) {
+        // 判空处理
         if (v == null) {
             return null;
         }
@@ -164,7 +288,9 @@ public class ExcelImportService {
         }
     }
 
+    //
     private Integer toInteger(Object v) {
+        // 判空处理
         if (v == null) {
             return null;
         }

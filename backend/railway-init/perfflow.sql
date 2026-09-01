@@ -197,6 +197,23 @@ CREATE TABLE `dept_kpi_row` (
   KEY `idx_assessment_id` (`dept_assessment_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='部门KPI明细行';
 
+-- ---------------- dept_assessment_flow_log 部门考核流程日志 ----------------
+DROP TABLE IF EXISTS `dept_assessment_flow_log`;
+CREATE TABLE `dept_assessment_flow_log` (
+  `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `assessment_id` BIGINT UNSIGNED NOT NULL,
+  `from_status`   TINYINT         NOT NULL COMMENT '来源状态编码',
+  `to_status`     TINYINT         NOT NULL COMMENT '目标状态编码',
+  `action`        VARCHAR(32)     NOT NULL COMMENT 'SUBMIT/REVIEW_PASS/REVIEW_REJECT/AUDIT_PASS/AUDIT_REJECT/APPROVE',
+  `operator_id`   BIGINT UNSIGNED NULL,
+  `operator_role` VARCHAR(16)     NULL,
+  `comment`       VARCHAR(500)    NULL,
+  `created_at`    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_assessment_id` (`assessment_id`),
+  KEY `idx_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='部门考核流程日志';
+
 -- ---------------- grade_quota_config 等级名额配置 ----------------
 DROP TABLE IF EXISTS `grade_quota_config`;
 CREATE TABLE `grade_quota_config` (

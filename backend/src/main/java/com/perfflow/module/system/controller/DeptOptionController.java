@@ -1,5 +1,4 @@
 package com.perfflow.module.system.controller;
-
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.perfflow.common.api.Result;
 import com.perfflow.module.system.dto.DeptResp;
@@ -12,13 +11,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
 import java.util.ArrayList;
 import java.util.List;
-
-/**
- * 部门选项（HR 开启部门线周期勾选用）。
- */
+// 部门选项（HR 开启部门线周期勾选用）。
 @Tag(name = "部门选项")
 @RestController
 @RequestMapping("/departments/options")
@@ -27,16 +22,24 @@ import java.util.List;
 public class DeptOptionController {
 
     private final SysDepartmentMapper deptMapper;
-
     @GetMapping
     @Operation(summary = "部门下拉列表")
+
+    // 查询列表
     public Result<List<DeptResp>> list() {
+
+        // 查询列表
         List<SysDepartment> all = deptMapper.selectList(
                 new QueryWrapper<SysDepartment>().orderByAsc("sort").orderByAsc("id"));
+        // 构建集合容器
         List<DeptResp> out = new ArrayList<>(all.size());
+
         for (SysDepartment d : all) {
+
             out.add(DeptResp.from(d));
         }
+
+        // 返回成功响应
         return Result.ok(out);
     }
 }

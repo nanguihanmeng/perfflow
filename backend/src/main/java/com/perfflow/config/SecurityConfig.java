@@ -1,5 +1,4 @@
 package com.perfflow.config;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.perfflow.common.api.Result;
 import com.perfflow.common.api.ResultCode;
@@ -23,14 +22,10 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
-
-/**
- * Spring Security 配置。
- */
+// Spring Security 配置。
 @Configuration
 @EnableMethodSecurity(prePostEnabled = true)
 @RequiredArgsConstructor
@@ -38,21 +33,28 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtFilter;
     private final ObjectMapper objectMapper;
-
     @Bean
+    // 执行 passwordEncoder。
+
     public PasswordEncoder passwordEncoder() {
+
         return new BCryptPasswordEncoder();
     }
 
     @Bean
+    // 执行 authenticationManager。
+
     public AuthenticationManager authenticationManager(AuthenticationConfiguration cfg) throws Exception {
+
         return cfg.getAuthenticationManager();
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        UrlBasedCorsConfigurationSource cors = corsSource();
+    // 执行 securityFilterChain。
 
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+
+        UrlBasedCorsConfigurationSource cors = corsSource();
         http
             .csrf(AbstractHttpConfigurer::disable)
             .formLogin(AbstractHttpConfigurer::disable)
@@ -71,15 +73,19 @@ public class SecurityConfig {
             )
             .exceptionHandling(eh -> eh
                 .authenticationEntryPoint((req, resp, ex) -> writeJson(resp, HttpStatus.UNAUTHORIZED,
+                        // 返回失败响应
                         Result.fail(ResultCode.UNAUTHORIZED, ex.getMessage())))
                 .accessDeniedHandler((req, resp, ex) -> writeJson(resp, HttpStatus.FORBIDDEN,
+                        // 返回失败响应
                         Result.fail(ResultCode.FORBIDDEN)))
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 
+    // 处理 corsSource
     private UrlBasedCorsConfigurationSource corsSource() {
+
         UrlBasedCorsConfigurationSource src = new UrlBasedCorsConfigurationSource();
         CorsConfiguration c = new CorsConfiguration();
         c.setAllowedOriginPatterns(List.of("*"));
@@ -91,7 +97,10 @@ public class SecurityConfig {
         return src;
     }
 
+    // 写入 Json
     private void writeJson(HttpServletResponse resp, HttpStatus status, Result<?> body) throws IOException {
+
+        // 设置状态
         resp.setStatus(status.value());
         resp.setContentType(MediaType.APPLICATION_JSON_VALUE);
         resp.setCharacterEncoding("UTF-8");

@@ -3,18 +3,22 @@
  * 部门考核管理（PERFORMANCE_HR）：全部门/全状态进度 + KPI 明细查看 + 指标 Excel 维护
  */
 import { onMounted, ref } from 'vue'
-import { downloadDeptTemplateApi, importDeptApi, listDeptAssessmentApi } from '@/api/dept.api'
+import { downloadDeptTemplateApi, importDeptApi, importDeptBatchApi, listDeptAssessmentApi } from '@/api/dept.api'
 import type { DeptAssessmentResp } from '@/types/dto'
 import { downloadBlob } from '@/utils/download'
+import { ElMessageBox } from 'element-plus'
 import { toastSuccess } from '@/utils/message'
 import PageHeader from '@/components/common/PageHeader.vue'
+import DeptFlowLog from '@/components/common/DeptFlowLog.vue'
 
 const loading = ref(false)
 const list = ref<DeptAssessmentResp[]>([])
 const detailVisible = ref(false)
 const detail = ref<DeptAssessmentResp | null>(null)
 const importingId = ref<number | null>(null)
+const batchImporting = ref(false)
 const fileInputs = ref<Record<number, HTMLInputElement | null>>({})
+const batchInput = ref<HTMLInputElement | null>(null)
 
 const statusLabel = (status: number): string => {
   const map: Record<number, string> = {
@@ -42,9 +46,9 @@ const showDetail = (row: DeptAssessmentResp): void => {
   detailVisible.value = true
 }
 
-const downloadTemplate = async (): Promise<void> => {
-  const res = await downloadDeptTemplateApi()
-  downloadBlob(res, 'dept-template.xls')
+const downloadTemplate = async (id?: number | null): Promise<void> => {
+  const res = await downloadDeptTemplateApi(id ?? null)
+  downloadBlob(res, `dept-template-${id ?? 'blank'}.xlsx`)
 }
 
 const pickFile = (id: number): void => {
@@ -67,13 +71,51 @@ const upload = async (id: number, event: Event): Promise<void> => {
     importingId.value = null
   }
 }
+
+/** 按周期批量导入：先输入周期ID，再选择文件 */
+const openBatchImport = async (): Promise<void> => {
+  const result = await ElMessageBox.prompt('请输入要导入的周期 ID', '批量导入部门考核指标', {
+    inputPattern: /^\d+$/,
+    inputErrorMessage: '周期 ID 必须为正整数'
+  })
+  batchPeriodId.value = Number(result.value.trim())
+  batchInput.value?.click()
+}
+
+const batchPeriodId = ref<number | null>(null)
+
+const batchUpload = async (event: Event): Promise<void> => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file || batchPeriodId.value == null) {
+    return
+  }
+  batchImporting.value = true
+  try {
+    await importDeptBatchApi(batchPeriodId.value, file)
+    toastSuccess('批量导入成功')
+    await load()
+  } finally {
+    batchImporting.value = false
+    batchPeriodId.value = null
+  }
+}
 </script>
 
 <template>
   <div class="dept-manage page-container">
     <PageHeader title="部门考核管理" description="跟进各部门考核进度，并维护各部门 KPI 指标（指标名称 / 目标值 / 评分标准 / 权重）">
       <template #actions>
-        <el-button type="primary" plain @click="downloadTemplate">下载指标模板</el-button>
+        <el-button type="primary" plain :loading="batchImporting" @click="openBatchImport">批量导入</el-button>
+        <el-button type="primary" plain @click="downloadTemplate()">下载空模板</el-button>
+        <input
+          ref="batchInput"
+          type="file"
+          accept=".xls,.xlsx"
+          style="display: none"
+          @change="(e: Event) => void batchUpload(e)"
+        />
       </template>
     </PageHeader>
 
@@ -95,9 +137,12 @@ const upload = async (id: number, event: Event): Promise<void> => {
         <el-table-column label="提交时间" width="170" align="center">
           <template #default="{ row }">{{ row.submittedAt ?? '—' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="220" align="center" fixed="right">
+        <el-table-column label="操作" width="280" align="center" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="showDetail(row as DeptAssessmentResp)">明细</el-button>
+            <el-button link type="info" size="small" @click="downloadTemplate((row as DeptAssessmentResp).id)">
+              下载模板
+            </el-button>
             <el-button
               link
               type="success"
@@ -151,6 +196,9 @@ const upload = async (id: number, event: Event): Promise<void> => {
             <template #default="{ row }">{{ row.weight ?? '—' }}</template>
           </el-table-column>
         </el-table>
+        <div class="dept-detail-flow">
+          <DeptFlowLog v-if="detailVisible && detail" :assessment-id="detail.id" />
+        </div>
       </template>
     </el-dialog>
   </div>
@@ -162,5 +210,9 @@ const upload = async (id: number, event: Event): Promise<void> => {
   gap: 24px;
   margin-bottom: 16px;
   font-weight: 600;
+}
+
+.dept-detail-flow {
+  margin-top: 16px;
 }
 </style>

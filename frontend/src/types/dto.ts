@@ -309,6 +309,20 @@ export interface DeptAssessmentResp {
   rows: DeptKpiRowResp[]
 }
 
+/** 部门考核流程日志响应 */
+export interface DeptFlowLogResp {
+  id: number
+  assessmentId: number
+  fromStatus: number
+  toStatus: number
+  action: string
+  operatorId: number | null
+  operatorName: string | null
+  operatorRole: string | null
+  comment: string | null
+  createdAt: string
+}
+
 /* ------------------------- 进度看板 /monitor ------------------------- */
 
 export interface DeptProgressResp {
