@@ -9,6 +9,7 @@ import com.perfflow.module.assessment.dto.AssessmentTableResp;
 import com.perfflow.module.assessment.dto.RowResp;
 import com.perfflow.module.assessment.entity.AssessmentRow;
 import com.perfflow.module.assessment.entity.AssessmentTable;
+import com.perfflow.module.assessment.enums.AssessmentState;
 import com.perfflow.module.assessment.mapper.AssessmentRowMapper;
 import com.perfflow.module.assessment.mapper.AssessmentTableMapper;
 import com.perfflow.module.period.entity.AssessmentPeriod;
@@ -34,18 +35,42 @@ public class AssessmentExportService {
     private final SysUserMapper userMapper;
     private final SysDepartmentMapper deptMapper;
     private final AssessmentTableService tableService;
-    // 导出某周期所有主表为 Excel（模板 A1:G16 格式）。
+    // 导出某周期已完成考核主表为 Excel（模板 A1:G16 格式），
+     // 未完成填报的人员在表格最下方以小字说明。
 
-    // 导出考核 Excel
+     // 导出考核 Excel
     public byte[] exportExcel(Long periodId) {
 
+        // 校验必须指定周期
+        if (periodId == null) {
+
+            // 校验失败抛异常
+            throw new BizException(ResultCode.BAD_REQUEST, "请选择要导出的考核周期");
+        }
+
         // 查询单条
-        AssessmentPeriod period = periodId == null ? null : periodMapper.selectById(periodId);
+        AssessmentPeriod period = periodMapper.selectById(periodId);
+
+        // 判空处理
+        if (period == null) {
+
+            // 校验失败抛异常
+            throw new BizException(ResultCode.NOT_FOUND, "考核周期不存在");
+        }
+
         // 查询列表
-        List<AssessmentTable> tables = tableMapper.selectList(
+        List<AssessmentTable> allTables = tableMapper.selectList(
                 new QueryWrapper<AssessmentTable>()
-                        .eq(periodId != null, "period_id", periodId)
+                        .eq("period_id", periodId)
                         .orderByAsc("dept_id").orderByAsc("user_id"));
+        // 仅导出已完成（FINISHED）填报的主表
+        List<AssessmentTable> tables = allTables.stream()
+                .filter(t -> AssessmentState.FINISHED.name().equals(t.getState()))
+                .toList();
+        // 未完成填报人员（含状态），用于底部说明
+        List<AssessmentTable> unfinished = allTables.stream()
+                .filter(t -> !AssessmentState.FINISHED.name().equals(t.getState()))
+                .toList();
         // 批量加载用户/部门缓存，避免 N+1
         Map<Long, String> userCache = new HashMap<>();
         // 构建集合容器
@@ -53,7 +78,7 @@ public class AssessmentExportService {
         // 构建集合容器
         Map<Long, String> deptLeadCache = new HashMap<>();
 
-        for (AssessmentTable t : tables) {
+        for (AssessmentTable t : allTables) {
 
             // 非空才处理
             if (t.getUserId() != null && !userCache.containsKey(t.getUserId())) {
@@ -77,7 +102,7 @@ public class AssessmentExportService {
             }
         }
 
-        try (ExcelWriter writer = ExcelUtil.getWriter();
+        try (ExcelWriter writer = ExcelUtil.getWriter(true);
 
              ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
 
@@ -89,6 +114,12 @@ public class AssessmentExportService {
 
                 writeTable(writer, style, t, period, idx, userCache, deptCache, deptLeadCache);
                 idx += 20; // 每表占 16 行 + 4 空行
+            }
+
+            // 未完成填报人员说明（表格最下方，小字灰色）
+            if (!unfinished.isEmpty()) {
+
+                writeUnfinishedNote(style, idx, unfinished, userCache, deptCache);
             }
 
             writer.flush(baos);
@@ -174,6 +205,56 @@ public class AssessmentExportService {
         style.setDataBorder(startRow + 3, startRow + 15, 1, 8);
     }
 
+    // 在表格最下方写入未完成填报人员说明（小字灰色）。
+    private void writeUnfinishedNote(ExportStyleUtil style, int startRow,
+                                     List<AssessmentTable> unfinished,
+                                     // 构建集合容器
+                                     Map<Long, String> userCache, Map<Long, String> deptCache) {
+
+        // 标题行
+        style.writeNote(startRow, 1, "以下人员尚未完成本周期填报，未纳入上表：");
+        startRow++;
+
+        for (AssessmentTable t : unfinished) {
+
+            String name = userCache.getOrDefault(t.getUserId(), "");
+            String dept = deptCache.getOrDefault(t.getDeptId(), "");
+            String stateLabel = stateLabel(t.getState());
+            // 逐行列出
+            style.writeNote(startRow++, 1, "· " + dept + " - " + name + "（" + stateLabel + "）");
+        }
+    }
+
+    // 未完成状态转中文标签
+    private String stateLabel(String state) {
+
+        if (state == null) return "未开始";
+
+        // 条件分支
+        switch (state) {
+
+            case "SELF_SUSPENDED":
+
+                return "挂起中";
+
+            case "DEPT_REVIEW":
+
+                return "待部门审核";
+
+            case "LEAD_SCORING":
+
+                return "待领导评分";
+
+            case "SELF_DRAFTING":
+
+                return "填报中";
+
+            default:
+
+                return state;
+        }
+    }
+
     private void setColumnWidths(ExportStyleUtil style) {
 
         style.setColumnWidth(0, 18);
@@ -190,25 +271,49 @@ public class AssessmentExportService {
     // 导出打印 HTML
     public String exportPrintHtml(Long periodId) {
 
+        // 校验必须指定周期
+        if (periodId == null) {
+
+            // 校验失败抛异常
+            throw new BizException(ResultCode.BAD_REQUEST, "请选择要导出的考核周期");
+        }
+
         // 查询单条
-        AssessmentPeriod period = periodId == null ? null : periodMapper.selectById(periodId);
+        AssessmentPeriod period = periodMapper.selectById(periodId);
+
+        // 判空处理
+        if (period == null) {
+
+            // 校验失败抛异常
+            throw new BizException(ResultCode.NOT_FOUND, "考核周期不存在");
+        }
+
         // 查询列表
-        List<AssessmentTable> tables = tableMapper.selectList(
+        List<AssessmentTable> allTables = tableMapper.selectList(
                 new QueryWrapper<AssessmentTable>()
-                        .eq(periodId != null, "period_id", periodId)
+                        .eq("period_id", periodId)
                         .orderByAsc("dept_id").orderByAsc("user_id"));
+        // 仅导出已完成（FINISHED）填报的主表
+        List<AssessmentTable> tables = allTables.stream()
+                .filter(t -> AssessmentState.FINISHED.name().equals(t.getState()))
+                .toList();
+        // 未完成填报人员（含状态），用于底部说明
+        List<AssessmentTable> unfinished = allTables.stream()
+                .filter(t -> !AssessmentState.FINISHED.name().equals(t.getState()))
+                .toList();
         StringBuilder sb = new StringBuilder();
         sb.append("<!doctype html><html><head><meta charset='utf-8'><title>")
-          .append(period == null ? "考核汇总" : period.getName()).append("</title>")
+          .append(period.getName()).append("</title>")
           .append("<style>")
           .append("body{font-family:Arial,sans-serif;}table{border-collapse:collapse;width:100%;margin-bottom:20px;}")
           .append("th,td{border:1px solid #000;padding:6px 10px;}th{background:#f4f4f4;}h2{margin:8px 0;}")
           .append(".title{font-size:18px;font-weight:bold;text-align:center;margin:8px 0;}")
           .append(".info{font-size:13px;margin:4px 0;}")
+          .append(".note{font-size:12px;color:#808080;margin:4px 0;}")
           .append("@media print { .no-print{display:none;} }")
           .append("</style></head><body>");
         sb.append("<div class='no-print'><button onclick='window.print()'>打印</button></div>");
-        sb.append("<h1>").append(period == null ? "考核汇总" : period.getName()).append("</h1>");
+        sb.append("<h1>").append(period.getName()).append("</h1>");
 
         for (AssessmentTable t : tables) {
 
@@ -263,6 +368,23 @@ public class AssessmentExportService {
               .append("</td></tr>");
             sb.append("</tbody></table>");
             sb.append("<div class='info'>部门负责人签字确认：　　　　被考核人签字确认：　　　　日期：</div>");
+        }
+
+        // 未完成填报人员说明（页面最下方，小字灰色）
+        if (!unfinished.isEmpty()) {
+
+            sb.append("<div class='note'>以下人员尚未完成本周期填报，未纳入上表：</div>");
+
+            for (AssessmentTable t : unfinished) {
+
+                SysUser u = userMapper.selectById(t.getUserId());
+                SysDepartment d = deptMapper.selectById(t.getDeptId());
+                String name = u == null ? "" : u.getRealName();
+                String dept = d == null ? "" : d.getName();
+                // 逐行列出
+                sb.append("<div class='note'>· ").append(dept).append(" - ").append(name)
+                  .append("（").append(stateLabel(t.getState())).append("）</div>");
+            }
         }
 
         sb.append("</body></html>");

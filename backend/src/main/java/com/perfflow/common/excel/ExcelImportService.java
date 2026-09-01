@@ -124,13 +124,15 @@ public class ExcelImportService {
         }
         try (ExcelReader reader = ExcelUtil.getReader(new ByteArrayInputStream(bytes))) {
             int lastRow = reader.getRowCount();
-            for (int row = 1; row < lastRow; row++) {
-                Integer seqNo = toInteger(reader.readCellValue(1, row));
+            // 跳过模板顶部的标题与格式说明行，定位到表头行
+            int dataStart = findDataStartRow(reader, lastRow);
+            for (int row = dataStart; row < lastRow; row++) {
+                Integer seqNo = toInteger(reader.readCellValue(2, row));
                 // 判空处理
                 if (seqNo == null) {
                     continue;
                 }
-                String rowType = cellStr(reader, 0, row);
+                String rowType = cellStr(reader, 1, row);
                 // 按 考核主表ID+序号 定位 KPI 行
                 DeptKpiRow target = deptKpiRowMapper.selectOne(new QueryWrapper<DeptKpiRow>()
                         .eq("dept_assessment_id", assessmentId)
@@ -144,10 +146,10 @@ public class ExcelImportService {
                 }
                 // 仅写入指标列，实际完成值与得分不在此维护
                 target.setRowType(rowType == null ? DeptAssessmentService.ROW_TYPE_KPI : rowType);
-                target.setIndicatorName(cellStr(reader, 2, row));
-                target.setTargetValue(cellStr(reader, 3, row));
-                target.setScoringStandard(cellStr(reader, 4, row));
-                target.setWeight(toBigDecimal(reader.readCellValue(5, row)));
+                target.setIndicatorName(cellStr(reader, 3, row));
+                target.setTargetValue(cellStr(reader, 4, row));
+                target.setScoringStandard(cellStr(reader, 5, row));
+                target.setWeight(toBigDecimal(reader.readCellValue(6, row)));
                 // 判空处理
                 if (target.getId() == null) {
                     // 写入记录
@@ -202,9 +204,11 @@ public class ExcelImportService {
         }
         try (ExcelReader reader = ExcelUtil.getReader(new ByteArrayInputStream(bytes))) {
             int lastRow = reader.getRowCount();
-            for (int row = 1; row < lastRow; row++) {
+            // 跳过模板顶部的标题与格式说明行，定位到表头行
+            int dataStart = findDataStartRow(reader, lastRow);
+            for (int row = dataStart; row < lastRow; row++) {
                 String deptName = cellStr(reader, 0, row);
-                Integer seqNo = toInteger(reader.readCellValue(1, row));
+                Integer seqNo = toInteger(reader.readCellValue(2, row));
                 // 判空处理
                 if (deptName == null || seqNo == null) {
                     continue;
@@ -231,8 +235,8 @@ public class ExcelImportService {
                     target.setSeqNo(seqNo);
                 }
                 // 仅写入指标列
-                target.setRowType(cellStr(reader, 2, row) == null
-                        ? DeptAssessmentService.ROW_TYPE_KPI : cellStr(reader, 2, row));
+                target.setRowType(cellStr(reader, 1, row) == null
+                        ? DeptAssessmentService.ROW_TYPE_KPI : cellStr(reader, 1, row));
                 target.setIndicatorName(cellStr(reader, 3, row));
                 target.setTargetValue(cellStr(reader, 4, row));
                 target.setScoringStandard(cellStr(reader, 5, row));
@@ -267,6 +271,27 @@ public class ExcelImportService {
             // 校验失败抛异常
             throw new BizException(ResultCode.BAD_REQUEST, "导入文件过大（上限 5MB）");
         }
+    }
+
+    // 定位数据起始行：跳过模板顶部的标题与格式说明，返回表头行号。
+     // 表头行包含「部门」「行类型」「序号」等列名；找不到时回退到第 1 行。
+    private int findDataStartRow(ExcelReader reader, int lastRow) {
+
+        // 从第 0 行开始找表头
+        for (int row = 0; row < lastRow; row++) {
+
+            String dept = cellStr(reader, 0, row);
+            String seq = cellStr(reader, 2, row);
+            // 同时命中「部门」列与「序号」列即视为表头行
+            if ("部门".equals(dept) && "序号".equals(seq)) {
+
+                // 表头行的下一行是数据起始行
+                return row + 1;
+            }
+        }
+
+        // 未找到表头，按旧格式回退到第 1 行开始
+        return 1;
     }
 
     //

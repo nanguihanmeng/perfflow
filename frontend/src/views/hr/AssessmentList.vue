@@ -6,6 +6,7 @@
  */
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { useTable } from '@/composables/useTable'
 import { deleteTableApi, exportExcelApi, getPrintHtmlApi, getTablePageApi, type TablePageQuery } from '@/api/assessment.api'
 import { getPeriodListApi } from '@/api/period.api'
@@ -52,10 +53,14 @@ const handleDelete = async (row: AssessmentTableResp): Promise<void> => {
 
 const exportLoading = ref(false)
 const handleExport = async (): Promise<void> => {
+  if (!query.periodId) {
+    ElMessage.warning('请先选择要导出的考核周期')
+    return
+  }
   exportLoading.value = true
   try {
-    const res = await exportExcelApi((query.periodId as number | undefined) ?? undefined)
-    downloadBlob(res, `assessment_${(query.periodId as number | undefined) ?? 'all'}.xlsx`)
+    const res = await exportExcelApi(query.periodId as number)
+    downloadBlob(res, `assessment_${query.periodId}.xlsx`)
     toastSuccess('导出成功')
   } finally {
     exportLoading.value = false
@@ -64,9 +69,13 @@ const handleExport = async (): Promise<void> => {
 
 const printLoading = ref(false)
 const handlePrint = async (): Promise<void> => {
+  if (!query.periodId) {
+    ElMessage.warning('请先选择要打印的考核周期')
+    return
+  }
   printLoading.value = true
   try {
-    const html = await getPrintHtmlApi((query.periodId as number | undefined) ?? undefined)
+    const html = await getPrintHtmlApi(query.periodId as number)
     const win = window.open('', '_blank')
     if (win) {
       win.document.open()
@@ -86,8 +95,8 @@ const handlePrint = async (): Promise<void> => {
     <PageHeader title="考核列表" description="查看各周期员工考核情况">
       <template #actions>
         <template v-if="isHr">
-          <el-button :loading="exportLoading" @click="handleExport">导出 Excel</el-button>
-          <el-button :loading="printLoading" @click="handlePrint">打印</el-button>
+          <el-button :loading="exportLoading" :disabled="!query.periodId" @click="handleExport">导出 Excel</el-button>
+          <el-button :loading="printLoading" :disabled="!query.periodId" @click="handlePrint">打印</el-button>
         </template>
       </template>
     </PageHeader>

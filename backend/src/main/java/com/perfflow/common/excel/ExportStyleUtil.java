@@ -22,6 +22,7 @@ public final class ExportStyleUtil {
     private static final Color MODULE_TITLE_BG = new Color(0x1F, 0x4E, 0x79);
     private static final Color HEADER_BG = new Color(0xDD, 0xEB, 0xF7);
     private static final Color BAND_COLOR = new Color(0x2E, 0x75, 0xB6);
+    private static final Color NOTE_GRAY = new Color(0x80, 0x80, 0x80);
     private static final int BAND_COLUMN_WIDTH = 2;
     private static final Color WHITE = Color.WHITE;
     private static final Color BLACK = Color.BLACK;
@@ -83,6 +84,15 @@ public final class ExportStyleUtil {
         Cell cell = getOrCreateCell(row, col);
         cell.setCellValue(safeString(text));
         cell.setCellStyle(style("data"));
+    }
+
+    // 在指定行写入小字灰色说明（用于导出表尾的未完成说明等）。
+
+    public void writeNote(int row, int col, String text) {
+
+        Cell cell = getOrCreateCell(row, col);
+        cell.setCellValue(safeString(text));
+        cell.setCellStyle(style("note"));
     }
 
     // 绘制最左侧装饰条（极窄深蓝列），支持多行连续。
@@ -209,6 +219,12 @@ public final class ExportStyleUtil {
                 style.setFont(font(false, BLACK));
             }
 
+            case "note" -> {
+
+                style.setAlignment(HorizontalAlignment.LEFT);
+                style.setFont(font(false, NOTE_GRAY, 9));
+            }
+
             default -> style.setWrapText(true);
         }
 
@@ -223,9 +239,14 @@ public final class ExportStyleUtil {
 
     private Font font(boolean bold, Color color) {
 
+        return font(bold, color, 11);
+    }
+
+    private Font font(boolean bold, Color color, int size) {
+
         Font f = workbook.createFont();
         f.setBold(bold);
-        f.setFontHeightInPoints((short) 11);
+        f.setFontHeightInPoints((short) size);
         ((org.apache.poi.xssf.usermodel.XSSFFont) f).setColor(new XSSFColor(color, null));
         return f;
     }

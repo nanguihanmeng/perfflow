@@ -18,7 +18,14 @@ import java.util.List;
 public class ExcelTemplateService {
 
     private static final String[] PERSONAL_HEADERS = {"序号", "指标类别", "指标名称", "指标分数", "工作目标", "评分标准", "完成率", "自评得分"};
-    private static final String[] DEPT_HEADERS = {"行类型", "序号", "指标名称", "目标值", "评分标准", "权重(%)"};
+    private static final String[] DEPT_HEADERS = {"部门", "行类型", "序号", "指标名称", "目标值", "评分标准", "权重(%)"};
+    private static final String[] DEPT_FORMAT_NOTES = {
+            "填写说明：每行一条 KPI 指标，按列对应填写",
+            "· 部门：必填（批量导入用，须与系统中部门名称一致）；单部门下载模板时留空，导入时按考核自动定位",
+            "· 行类型：经营业绩 / 运营指标 / 重点工作",
+            "· 序号：1-3 经营业绩、4-5 运营指标、6-7 重点工作（不得重复）",
+            "· 指标名称 / 目标值 / 评分标准 / 权重(%)：按实际填写，权重为 0-100 之间的数值"
+    };
     private static final String MODULE_TITLE = "PerfFlow 考核填报模板";
     // dept Assessment Mapper
     private final DeptAssessmentMapper deptAssessmentMapper;
@@ -28,7 +35,7 @@ public class ExcelTemplateService {
 
     public byte[] exportPersonalTemplate() {
 
-        try (ExcelWriter writer = ExcelUtil.getWriter();
+        try (ExcelWriter writer = ExcelUtil.getWriter(true);
 
              ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
 
@@ -52,22 +59,31 @@ public class ExcelTemplateService {
 
     public byte[] exportDeptTemplate(Long assessmentId) {
 
-        try (ExcelWriter writer = ExcelUtil.getWriter();
+        try (ExcelWriter writer = ExcelUtil.getWriter(true);
 
              ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
 
             ExportStyleUtil style = new ExportStyleUtil(writer);
             writer.renameSheet("部门考核填报模板");
-            style.writeModuleTitle(0, 0, DEPT_HEADERS.length, MODULE_TITLE);
-            style.writeHeaderRow(1, DEPT_HEADERS);
+            style.writeModuleTitle(0, 0, DEPT_HEADERS.length - 1, MODULE_TITLE);
+            // 格式说明行（小字灰色）
+            int noteRow = 1;
+
+            for (String note : DEPT_FORMAT_NOTES) {
+
+                style.writeNote(noteRow++, 0, note);
+            }
+
+            // 表头行
+            style.writeHeaderRow(noteRow, DEPT_HEADERS);
+            int rowIdx = noteRow + 1;
             List<DeptKpiRow> rows = loadKpiRows(assessmentId);
-            int rowIdx = 2;
 
             for (DeptKpiRow r : rows) {
 
                 style.writeDataRow(rowIdx++, new Object[]{
 
-                        r.getRowType(), r.getSeqNo(), r.getIndicatorName(),
+                        "", r.getRowType(), r.getSeqNo(), r.getIndicatorName(),
                         r.getTargetValue(), r.getScoringStandard(), r.getWeight()
                 });
             }
