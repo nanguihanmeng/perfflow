@@ -7,6 +7,10 @@ import java.io.Serializable;
 @Data
 public class ChangePasswordReq implements Serializable {
 
+    @NotBlank(message = "原密码不能为空")
+    // 原密码。
+    private String oldPassword;
+
     @NotBlank(message = "新密码不能为空")
     @Size(min = 8, max = 32, message = "新密码长度需在 8-32 位之间")
     // 新密码。

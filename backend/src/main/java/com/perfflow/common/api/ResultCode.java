@@ -32,6 +32,8 @@ public enum ResultCode {
     MUST_CHANGE_PASSWORD_INIT(1105, "首次登录必须修改密码"),
     // INIT_PASSWORD
     INIT_PASSWORD(1106, "请设置新密码"),
+    // ACCOUNT_LOCKED
+    ACCOUNT_LOCKED(1107, "登录失败次数过多，账号已临时锁定，请稍后再试"),
     // ---- 2000：业务规则 ----
     PERIOD_NOT_OPEN(2001, "考核周期未开启"),
     // PERMISSION_DENIED_FOR_ROW

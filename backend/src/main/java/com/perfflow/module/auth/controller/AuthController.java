@@ -61,7 +61,7 @@ public class AuthController {
     public Result<LoginResp> changePassword(@Valid @RequestBody ChangePasswordReq req) {
 
         // 返回成功响应
-        return Result.ok(authService.changePassword(req.getNewPassword()));
+        return Result.ok(authService.changePassword(req.getOldPassword(), req.getNewPassword()));
     }
 
     @PutMapping("/profile")

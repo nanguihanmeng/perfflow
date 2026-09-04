@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 修改密码页（首次登录强制改密场景）
- * 说明：不校验旧密码，仅确认两次新密码一致。改密成功后后端返回新令牌，
+ * 说明：需填写原密码（即当前登录所用密码），并确认两次新密码一致。改密成功后后端返回新令牌，
  * 前端直接覆盖本地令牌并进入工作台，无需重新登录（原 JWT 中 mustChangePwd=true 已被拒绝）。
  */
 import { reactive, ref } from 'vue'
@@ -18,6 +18,7 @@ const formRef = ref<FormInstance>()
 const loading = ref(false)
 
 const form = reactive({
+  oldPassword: '',
   newPassword: '',
   confirmPassword: ''
 })
@@ -31,6 +32,7 @@ const validateConfirm = (_rule: unknown, value: string, callback: (error?: Error
 }
 
 const rules: FormRules = {
+  oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
   newPassword: [
     { required: true, message: '请输入新密码', trigger: 'blur' },
     { min: 8, max: 32, message: '密码长度为 8-32 位', trigger: 'blur' }
@@ -49,12 +51,13 @@ const handleSubmit = async (): Promise<void> => {
   loading.value = true
   try {
     // 后端返回新令牌（mustChangePassword=false），直接覆盖本地登录态
-    const res = await changePasswordApi({ newPassword: form.newPassword })
+    const res = await changePasswordApi({ oldPassword: form.oldPassword, newPassword: form.newPassword })
     authStore.setLogin(res.data)
     toastSuccess('密码修改成功')
     router.push('/home')
-  } catch {
-    toastError('密码修改失败，请稍后重试')
+  } catch (err) {
+    // silent 请求不弹全局提示，这里展示后端具体原因（如原密码错误）
+    toastError(err instanceof Error && err.message ? err.message : '密码修改失败，请稍后重试')
   } finally {
     loading.value = false
   }
@@ -77,6 +80,9 @@ const handleCancel = (): void => {
         label-width="90px"
         size="large"
       >
+        <el-form-item label="原密码" prop="oldPassword">
+          <el-input v-model="form.oldPassword" type="password" show-password placeholder="请输入原密码" />
+        </el-form-item>
         <el-form-item label="新密码" prop="newPassword">
           <el-input v-model="form.newPassword" type="password" show-password placeholder="8-32 位" />
         </el-form-item>

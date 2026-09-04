@@ -42,11 +42,9 @@ export interface CurrentUserSnapshot {
   mustChangePassword: boolean
 }
 
-/**
- * 预留：用户改密（错误码 1105/1106）。
- * 前端不校验旧密码，仅提交新密码；后端如需校验旧密码可在联调时同步调整契约。
- */
+/** 用户改密请求体：需携带原密码，后端校验通过后返回新令牌 */
 export interface ChangePasswordReq {
+  oldPassword: string
   newPassword: string
 }
 
