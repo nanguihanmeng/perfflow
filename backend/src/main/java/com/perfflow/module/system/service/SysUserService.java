@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.perfflow.common.api.ResultCode;
 import com.perfflow.common.constant.RoleConst;
 import com.perfflow.common.exception.BizException;
+import com.perfflow.module.assessment.entity.AssessmentTable;
+import com.perfflow.module.assessment.mapper.AssessmentTableMapper;
 import com.perfflow.module.system.dto.UserCreateReq;
 import com.perfflow.module.system.dto.UserResp;
 import com.perfflow.module.system.dto.UserUpdateReq;
@@ -29,6 +31,7 @@ public class SysUserService {
 
     private final SysUserMapper userMapper;
     private final SysDepartmentMapper deptMapper;
+    private final AssessmentTableMapper assessmentTableMapper;
     private final PasswordEncoder passwordEncoder;
     @Value("${perfflow.default-pwd:12345678}")
     private String defaultPwd;
@@ -290,6 +293,16 @@ public class SysUserService {
 
         // 权限或数据校验
         assertNotPerformanceHr(u, "删除");
+        // 已参与考核的用户保留历史数据，禁止删除
+        Long tableCount = assessmentTableMapper.selectCount(new QueryWrapper<AssessmentTable>()
+                .eq("user_id", id));
+        if (tableCount != null && tableCount > 0) {
+
+            // 校验失败抛异常
+            throw new BizException(ResultCode.BAD_REQUEST,
+                    "该用户已参与考核并存在考核记录，不可删除，可改用禁用账号");
+        }
+
         // 删除记录
         userMapper.deleteById(id);
     }
