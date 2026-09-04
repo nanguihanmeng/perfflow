@@ -29,8 +29,12 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 //
  // 部门考核服务：KPI 填报、复核、初审、审批、部门等级自动计算。
  //
@@ -349,11 +353,35 @@ public class DeptAssessmentService {
         qw.orderByDesc("id");
         // 查询列表
         List<DeptAssessment> list = deptAssessmentMapper.selectList(qw);
+
+        // 批量加载部门名，避免列表 N+1 查询
+        Map<Long, String> deptNames = new HashMap<>();
+        List<Long> deptIds = list.stream().map(DeptAssessment::getDeptId)
+                .filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        if (!deptIds.isEmpty()) {
+            for (SysDepartment dept : deptMapper.selectBatchIds(deptIds)) {
+                deptNames.put(dept.getId(), dept.getName());
+            }
+        }
+
+        // 批量加载 KPI 行（一次 IN 查询，分组后顺序与单表查询一致）
+        Map<Long, List<DeptKpiRowResp>> rowsByAssessment = new HashMap<>();
+        if (!list.isEmpty()) {
+            List<Long> ids = list.stream().map(DeptAssessment::getId).collect(Collectors.toList());
+            List<DeptKpiRow> rows = kpiRowMapper.selectList(new QueryWrapper<DeptKpiRow>()
+                    .in("dept_assessment_id", ids)
+                    .orderByAsc("row_type")
+                    .orderByAsc("seq_no"));
+            for (DeptKpiRow r : rows) {
+                rowsByAssessment.computeIfAbsent(r.getDeptAssessmentId(), k -> new ArrayList<>()).add(toRowResp(r));
+            }
+        }
+
         // 构建集合容器
         List<DeptAssessmentResp> out = new ArrayList<>(list.size());
         for (DeptAssessment d : list) {
-            // 转换响应对象
-            out.add(toResp(d));
+            out.add(toResp(d, deptNames.get(d.getDeptId()),
+                    rowsByAssessment.getOrDefault(d.getId(), Collections.emptyList())));
         }
         // 返回结果
         return out;
@@ -665,13 +693,19 @@ public class DeptAssessmentService {
 
     //
     private DeptAssessmentResp toResp(DeptAssessment d) {
+        // 查询单条
+        SysDepartment dept = deptMapper.selectById(d.getDeptId());
+        // 返回结果
+        return toResp(d, dept == null ? null : dept.getName(), listRowResps(d.getId()));
+    }
+
+    // 组装响应（部门名与 KPI 行由调用方提供，供列表批量复用避免 N+1）。
+    private DeptAssessmentResp toResp(DeptAssessment d, String deptName, List<DeptKpiRowResp> rows) {
         DeptAssessmentResp resp = new DeptAssessmentResp();
         resp.setId(d.getId());
         resp.setPeriodId(d.getPeriodId());
         resp.setDeptId(d.getDeptId());
-        // 查询单条
-        SysDepartment dept = deptMapper.selectById(d.getDeptId());
-        resp.setDeptName(dept == null ? null : dept.getName());
+        resp.setDeptName(deptName);
         resp.setKpiScore(d.getKpiScore());
         resp.setOperationScore(d.getOperationScore());
         resp.setKeyWorkScore(d.getKeyWorkScore());
@@ -685,8 +719,7 @@ public class DeptAssessmentService {
         resp.setApprovedAt(d.getApprovedAt());
         resp.setVersion(d.getVersion());
         resp.setAdjustReason(d.getAdjustReason());
-        // 查询 KPI 行
-        resp.setRows(listRowResps(d.getId()));
+        resp.setRows(rows);
         // 返回结果
         return resp;
     }
@@ -707,21 +740,27 @@ public class DeptAssessmentService {
         // 构建集合容器
         List<DeptKpiRowResp> out = new ArrayList<>(rows.size());
         for (DeptKpiRow r : rows) {
-            DeptKpiRowResp resp = new DeptKpiRowResp();
-            resp.setId(r.getId());
-            resp.setDeptAssessmentId(r.getDeptAssessmentId());
-            resp.setRowType(r.getRowType());
-            resp.setSeqNo(r.getSeqNo());
-            resp.setIndicatorName(r.getIndicatorName());
-            resp.setTargetValue(r.getTargetValue());
-            resp.setActualValue(r.getActualValue());
-            resp.setScoringStandard(r.getScoringStandard());
-            resp.setScore(r.getScore());
-            resp.setWeight(r.getWeight());
-            out.add(resp);
+            out.add(toRowResp(r));
         }
         // 返回结果
         return out;
+    }
+
+    // 单行 KPI 转响应对象。
+    private DeptKpiRowResp toRowResp(DeptKpiRow r) {
+        DeptKpiRowResp resp = new DeptKpiRowResp();
+        resp.setId(r.getId());
+        resp.setDeptAssessmentId(r.getDeptAssessmentId());
+        resp.setRowType(r.getRowType());
+        resp.setSeqNo(r.getSeqNo());
+        resp.setIndicatorName(r.getIndicatorName());
+        resp.setTargetValue(r.getTargetValue());
+        resp.setActualValue(r.getActualValue());
+        resp.setScoringStandard(r.getScoringStandard());
+        resp.setScore(r.getScore());
+        resp.setWeight(r.getWeight());
+        // 返回结果
+        return resp;
     }
 
     //

@@ -41,11 +41,6 @@ import java.util.function.Consumer;
 @RequiredArgsConstructor
 public class AssessmentTableService {
 
-    //
-    private static final List<String> ASSESSED_ROLES = List.of(
-            RoleConst.ROLE_EMP, RoleConst.ROLE_DEPT_LEAD, RoleConst.ROLE_LEAD,
-            RoleConst.ROLE_DEPT_STAFF, RoleConst.ROLE_OPERATION, RoleConst.ROLE_COMMITTEE);
-    //
     private static final int MAX_SUSPEND_EXTEND_DAYS = 30;
     //
     private static final int USER_STATUS_ENABLED = 1;
@@ -219,7 +214,7 @@ public class AssessmentTableService {
         // 校验被考核人本人提交（排除 HR/ADMIN）
         if (!DataScopeContext.currentUserId().equals(t.getUserId())
                 // 数据权限处理
-                || !ASSESSED_ROLES.contains(perm.currentRole())) {
+                || !RoleConst.ASSESSED_ROLES.contains(perm.currentRole())) {
             // 校验失败抛异常
             throw new BizException(ResultCode.FORBIDDEN);
         }
@@ -260,11 +255,9 @@ public class AssessmentTableService {
         t.setState(AssessmentState.SELF_SUSPENDED.name());
         t.setSubmittedAt(LocalDateTime.now());
         // 冻结所有行，提交后不可修改
-        for (AssessmentRow r : rows) {
-            r.setFrozen(true);
-            // 更新记录
-            rowMapper.updateById(r);
-        }
+        rowMapper.update(null, new LambdaUpdateWrapper<AssessmentRow>()
+                .eq(AssessmentRow::getTableId, t.getId())
+                .set(AssessmentRow::getFrozen, true));
         // 记录流程留痕
         flowService.writeLog(t, AssessmentState.SELF_DRAFTING, AssessmentState.SELF_SUSPENDED, "SUBMIT");
         log.info("员工提交考核表: tableId={}, userId={}", tableId, t.getUserId());
@@ -355,13 +348,9 @@ public class AssessmentTableService {
         assertTransitioned(ok);
         t.setState(AssessmentState.SELF_DRAFTING.name());
         // 解冻行，允许员工重新填报
-        List<AssessmentRow> rows = rowMapper.selectList(
-                new QueryWrapper<AssessmentRow>().eq("table_id", t.getId()));
-        for (AssessmentRow r : rows) {
-            r.setFrozen(false);
-            // 更新记录
-            rowMapper.updateById(r);
-        }
+        rowMapper.update(null, new LambdaUpdateWrapper<AssessmentRow>()
+                .eq(AssessmentRow::getTableId, t.getId())
+                .set(AssessmentRow::getFrozen, false));
         // 记录流程留痕
         flowService.writeLog(t, AssessmentState.DEPT_REVIEW, AssessmentState.SELF_DRAFTING, "REJECT", comment);
         log.info("部门负责人打回考核表: tableId={}, comment={}", tableId, comment);
@@ -508,7 +497,7 @@ public class AssessmentTableService {
     @Transactional
     public void initForPeriod(AssessmentPeriod period, List<Long> userIds) {
         QueryWrapper<SysUser> qw = new QueryWrapper<SysUser>()
-                .in("role", ASSESSED_ROLES)
+                .in("role", RoleConst.ASSESSED_ROLES)
                 .eq("status", USER_STATUS_ENABLED);
         // 非空才处理
         if (userIds != null && !userIds.isEmpty()) {
