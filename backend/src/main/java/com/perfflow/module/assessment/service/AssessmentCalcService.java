@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 // 考核计算服务：负责单行自评分、自评总分、最终得分、等级。
- // 纯计算，不读权限。
+// 纯计算，不读权限。
 @Service
 @RequiredArgsConstructor
 public class AssessmentCalcService {
@@ -24,7 +24,7 @@ public class AssessmentCalcService {
     // 执行业务处理
     public static BigDecimal calcSelfScore(BigDecimal baseScore, BigDecimal completionRate) {
 
-        if (baseScore == null || completionRate == null) return null;
+        if (baseScore == null || completionRate == null){ return null;}
         BigDecimal score = baseScore.multiply(completionRate).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
         return score.setScale(2, RoundingMode.HALF_UP);
     }
@@ -127,11 +127,11 @@ public class AssessmentCalcService {
     // 执行业务处理
     public static String gradeOf(BigDecimal finalScore) {
 
-        if (finalScore == null) return null;
+        if (finalScore == null){ return null;}
         double v = finalScore.doubleValue();
-        if (v >= 90) return "A";
-        if (v >= 75) return "B";
-        if (v >= 60) return "C";
+        if (v >= 90) {return "A";}
+        if (v >= 75) {return "B";}
+        if (v >= 60) {return "C";}
         return "D";
     }
 }

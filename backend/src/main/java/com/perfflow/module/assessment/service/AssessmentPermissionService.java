@@ -6,24 +6,20 @@ import com.perfflow.common.exception.BizException;
 import com.perfflow.module.assessment.entity.AssessmentRow;
 import com.perfflow.module.assessment.entity.AssessmentTable;
 import com.perfflow.module.assessment.enums.AssessmentState;
+import com.perfflow.module.assessment.enums.RowCategory;
 import com.perfflow.module.assessment.mapper.AssessmentTableMapper;
 import com.perfflow.module.system.entity.SysUser;
 import com.perfflow.module.system.mapper.SysUserMapper;
 import com.perfflow.security.DataScopeContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 // 评估数据权限 + 字段脱敏判定。
 @Service
 @RequiredArgsConstructor
 public class AssessmentPermissionService {
 
-    private static final List<String> ASSESSED_ROLES = List.of(
-            RoleConst.ROLE_EMP, RoleConst.ROLE_DEPT_LEAD, RoleConst.ROLE_LEAD,
-            RoleConst.ROLE_DEPT_STAFF, RoleConst.ROLE_OPERATION, RoleConst.ROLE_COMMITTEE);
     private final AssessmentTableMapper tableMapper;
     private final SysUserMapper userMapper;
 
@@ -154,7 +150,7 @@ public class AssessmentPermissionService {
         String role = currentRole();
         if (role == null) return false;
         AssessmentState cur = AssessmentState.valueOf(t.getState());
-        boolean isPlanOrOpen = r.getCategory() != null && !"BONUS".equals(r.getCategory());
+        boolean isPlanOrOpen = r.getCategory() != null && !RowCategory.BONUS.name().equals(r.getCategory());
 
         return switch (role) {
 
@@ -303,19 +299,11 @@ public class AssessmentPermissionService {
         return tableMapper.selectList(qw).stream().map(AssessmentTable::getId).collect(Collectors.toList());
     }
 
-    // 执行 visibleStates。
-
-    // 执行业务处理
-    public Set<String> visibleStates() {
-        // 当前所有状态都可见，仅用于过滤器
-        return Collections.emptySet();
-    }
-
     // ==================== 辅助 ====================
 
     private boolean isAssessed(String role) {
 
-        return ASSESSED_ROLES.contains(role);
+        return RoleConst.ASSESSED_ROLES.contains(role);
     }
 
     private boolean isOwn(AssessmentTable t) {

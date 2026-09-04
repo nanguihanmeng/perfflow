@@ -4,6 +4,7 @@ import cn.hutool.poi.excel.ExcelUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.perfflow.common.api.ResultCode;
 import com.perfflow.common.constant.RoleConst;
+import com.perfflow.common.excel.ExcelReadUtil;
 import com.perfflow.common.exception.BizException;
 import com.perfflow.module.assessment.entity.AssessmentRow;
 import com.perfflow.module.assessment.entity.AssessmentTable;
@@ -47,20 +48,19 @@ public class PeriodImportService {
 
             for (int row = 0; row < lastRow; row++) {
 
-                Object usernameCell = reader.readCellValue(0, row);
-                boolean isBlockStart = usernameCell != null
-                        && !String.valueOf(usernameCell).trim().isEmpty();
+                String usernameCell = ExcelReadUtil.cellStr(reader, 0, row);
+                boolean isBlockStart = usernameCell != null && !usernameCell.isEmpty();
 
                 // 条件分支
                 if (isBlockStart && !blockRows.isEmpty()) {
                     // 上一个员工块结束（新员工出现）
                     userIds.add(processEmployee(period, currentUsername, reader, blockRows));
-                    currentUsername = String.valueOf(usernameCell).trim();
+                    currentUsername = usernameCell;
                     blockRows = new ArrayList<>();
 
                 } else if (isBlockStart) {
 
-                    currentUsername = String.valueOf(usernameCell).trim();
+                    currentUsername = usernameCell;
                     blockRows = new ArrayList<>();
 
                 } else if (blockRows.size() == ROWS_PER_EMPLOYEE) {
@@ -153,10 +153,10 @@ public class PeriodImportService {
 
             int excelRow = rows.get(i);
             AssessmentRow r = tableRows.get(i);
-            r.setIndicatorName(cellStr(reader, 3, excelRow));
-            r.setWorkTarget(cellStr(reader, 5, excelRow));
-            r.setScoreCriteria(cellStr(reader, 6, excelRow));
-            BigDecimal baseScore = cellBig(reader, 4, excelRow);
+            r.setIndicatorName(ExcelReadUtil.cellStr(reader, 3, excelRow));
+            r.setWorkTarget(ExcelReadUtil.cellStr(reader, 5, excelRow));
+            r.setScoreCriteria(ExcelReadUtil.cellStr(reader, 6, excelRow));
+            BigDecimal baseScore = ExcelReadUtil.toBigDecimal(reader.readCellValue(4, excelRow));
 
             // 非空才处理
             if (baseScore != null) {
@@ -171,26 +171,4 @@ public class PeriodImportService {
         return user.getId();
     }
 
-    // 读取单元格字符串
-    private String cellStr(ExcelReader reader, int col, int row) {
-
-        Object v = reader.readCellValue(col, row);
-        return v == null ? null : String.valueOf(v).trim();
-    }
-
-    // 处理 cellBig
-    private BigDecimal cellBig(ExcelReader reader, int col, int row) {
-
-        Object v = reader.readCellValue(col, row);
-        if (v == null) return null;
-
-        try {
-
-            return new BigDecimal(String.valueOf(v).trim());
-
-        } catch (NumberFormatException e) {
-
-            return null;
-        }
-    }
 }

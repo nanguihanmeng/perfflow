@@ -1,6 +1,9 @@
 package com.perfflow.common.constant;
 // 角色与状态常量。
 
+import java.util.List;
+import java.util.Set;
+
 public final class RoleConst {
 
     private RoleConst() {}
@@ -14,6 +17,21 @@ public final class RoleConst {
     public static final String ROLE_DEPT_STAFF   = "DEPT_STAFF";
     public static final String ROLE_OPERATION    = "OPERATION";
     public static final String ROLE_COMMITTEE    = "COMMITTEE";
+    // ---- 全部角色（新增角色登记于此，默认即参与被考核）----
+    public static final List<String> ALL_ROLES = List.of(
+            ROLE_EMP, ROLE_DEPT_LEAD, ROLE_LEAD,
+            ROLE_PERFORMANCE_HR, ROLE_ADMIN,
+            ROLE_DEPT_STAFF, ROLE_OPERATION, ROLE_COMMITTEE);
+    // ---- 只行使管理/审核、不参与被考核的角色 ----
+    private static final Set<String> NON_ASSESSED_ROLES = Set.of(
+            ROLE_ADMIN, ROLE_PERFORMANCE_HR);
+
+    // ---- 参与考核的角色 = 全部角色 − 非被考核角色 ----
+    // 新增角色：登记进 ALL_ROLES 即自动参与被考核，无需再改这里；
+    // 仅当新角色属"只管理不参与被考核"时，再额外加进 NON_ASSESSED_ROLES 即可。
+    public static final List<String> ASSESSED_ROLES = ALL_ROLES.stream()
+            .filter(role -> !NON_ASSESSED_ROLES.contains(role))
+            .toList();
     // ---- Spring Security role prefix ----
     public static final String SEC_EMP           = "ROLE_EMP";
     public static final String SEC_DEPT_LEAD     = "ROLE_DEPT_LEAD";

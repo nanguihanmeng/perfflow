@@ -6,7 +6,6 @@ import com.perfflow.module.assessment.dto.RowReq;
 import com.perfflow.module.assessment.entity.AssessmentRow;
 import com.perfflow.module.assessment.entity.AssessmentTable;
 import com.perfflow.module.assessment.enums.AssessmentState;
-import com.perfflow.module.assessment.enums.RowCategory;
 import com.perfflow.module.assessment.mapper.AssessmentRowMapper;
 import com.perfflow.security.DataScopeContext;
 import lombok.RequiredArgsConstructor;
@@ -140,9 +139,4 @@ public class AssessmentRowService {
         return r;
     }
 
-    // 执行业务处理
-    public boolean isBonusRow(AssessmentRow r) {
-
-        return RowCategory.BONUS.name().equals(r.getCategory());
-    }
 }

@@ -39,9 +39,6 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ExcelImportService {
 
-    //
-    private static final long MAX_FILE_SIZE = 5 * 1024 * 1024;
-
     private final AssessmentRowMapper assessmentRowMapper;
     private final DeptKpiRowMapper deptKpiRowMapper;
     private final DeptAssessmentMapper deptAssessmentMapper;
@@ -56,11 +53,11 @@ public class ExcelImportService {
     @Transactional(rollbackFor = Exception.class)
     public void importPersonal(Long tableId, byte[] bytes) {
         // 校验文件合法性
-        assertFile(bytes);
+        ExcelReadUtil.assertFile(bytes);
         try (ExcelReader reader = ExcelUtil.getReader(new ByteArrayInputStream(bytes))) {
             int lastRow = reader.getRowCount();
             for (int row = 1; row < lastRow; row++) {
-                Integer seq = toInteger(reader.readCellValue(0, row));
+                Integer seq = ExcelReadUtil.toInteger(reader.readCellValue(0, row));
                 // 判空处理
                 if (seq == null) {
                     continue;
@@ -75,15 +72,15 @@ public class ExcelImportService {
                     continue;
                 }
                 // 覆盖写指标字段
-                target.setIndicatorName(cellStr(reader, 2, row));
-                BigDecimal baseScore = toBigDecimal(reader.readCellValue(3, row));
+                target.setIndicatorName(ExcelReadUtil.cellStr(reader, 2, row));
+                BigDecimal baseScore = ExcelReadUtil.toBigDecimal(reader.readCellValue(3, row));
                 // 非空才处理
                 if (baseScore != null) {
                     target.setBaseScore(baseScore);
                 }
-                target.setWorkTarget(cellStr(reader, 4, row));
-                target.setScoreCriteria(cellStr(reader, 5, row));
-                BigDecimal rate = toBigDecimal(reader.readCellValue(6, row));
+                target.setWorkTarget(ExcelReadUtil.cellStr(reader, 4, row));
+                target.setScoreCriteria(ExcelReadUtil.cellStr(reader, 5, row));
+                BigDecimal rate = ExcelReadUtil.toBigDecimal(reader.readCellValue(6, row));
                 // 非空才处理
                 if (rate != null) {
                     target.setCompletionRate(rate);
@@ -109,7 +106,7 @@ public class ExcelImportService {
      //
     @Transactional(rollbackFor = Exception.class)
     public void importDept(Long assessmentId, byte[] bytes) {
-        assertFile(bytes);
+        ExcelReadUtil.assertFile(bytes);
         // 校验考核存在且处于自评中
         DeptAssessment assessment = deptAssessmentMapper.selectById(assessmentId);
         // 判空处理
@@ -127,12 +124,12 @@ public class ExcelImportService {
             // 跳过模板顶部的标题与格式说明行，定位到表头行
             int dataStart = findDataStartRow(reader, lastRow);
             for (int row = dataStart; row < lastRow; row++) {
-                Integer seqNo = toInteger(reader.readCellValue(2, row));
+                Integer seqNo = ExcelReadUtil.toInteger(reader.readCellValue(2, row));
                 // 判空处理
                 if (seqNo == null) {
                     continue;
                 }
-                String rowType = cellStr(reader, 1, row);
+                String rowType = ExcelReadUtil.cellStr(reader, 1, row);
                 // 按 考核主表ID+序号 定位 KPI 行
                 DeptKpiRow target = deptKpiRowMapper.selectOne(new QueryWrapper<DeptKpiRow>()
                         .eq("dept_assessment_id", assessmentId)
@@ -146,10 +143,10 @@ public class ExcelImportService {
                 }
                 // 仅写入指标列，实际完成值与得分不在此维护
                 target.setRowType(rowType == null ? DeptAssessmentService.ROW_TYPE_KPI : rowType);
-                target.setIndicatorName(cellStr(reader, 3, row));
-                target.setTargetValue(cellStr(reader, 4, row));
-                target.setScoringStandard(cellStr(reader, 5, row));
-                target.setWeight(toBigDecimal(reader.readCellValue(6, row)));
+                target.setIndicatorName(ExcelReadUtil.cellStr(reader, 3, row));
+                target.setTargetValue(ExcelReadUtil.cellStr(reader, 4, row));
+                target.setScoringStandard(ExcelReadUtil.cellStr(reader, 5, row));
+                target.setWeight(ExcelReadUtil.toBigDecimal(reader.readCellValue(6, row)));
                 // 判空处理
                 if (target.getId() == null) {
                     // 写入记录
@@ -177,7 +174,7 @@ public class ExcelImportService {
      //
     @Transactional(rollbackFor = Exception.class)
     public void importDeptBatch(Long periodId, byte[] bytes) {
-        assertFile(bytes);
+        ExcelReadUtil.assertFile(bytes);
         // 校验周期存在
         AssessmentPeriod period = periodMapper.selectById(periodId);
         // 判空处理
@@ -207,8 +204,8 @@ public class ExcelImportService {
             // 跳过模板顶部的标题与格式说明行，定位到表头行
             int dataStart = findDataStartRow(reader, lastRow);
             for (int row = dataStart; row < lastRow; row++) {
-                String deptName = cellStr(reader, 0, row);
-                Integer seqNo = toInteger(reader.readCellValue(2, row));
+                String deptName = ExcelReadUtil.cellStr(reader, 0, row);
+                Integer seqNo = ExcelReadUtil.toInteger(reader.readCellValue(2, row));
                 // 判空处理
                 if (deptName == null || seqNo == null) {
                     continue;
@@ -235,12 +232,12 @@ public class ExcelImportService {
                     target.setSeqNo(seqNo);
                 }
                 // 仅写入指标列
-                target.setRowType(cellStr(reader, 1, row) == null
-                        ? DeptAssessmentService.ROW_TYPE_KPI : cellStr(reader, 1, row));
-                target.setIndicatorName(cellStr(reader, 3, row));
-                target.setTargetValue(cellStr(reader, 4, row));
-                target.setScoringStandard(cellStr(reader, 5, row));
-                target.setWeight(toBigDecimal(reader.readCellValue(6, row)));
+                target.setRowType(ExcelReadUtil.cellStr(reader, 1, row) == null
+                        ? DeptAssessmentService.ROW_TYPE_KPI : ExcelReadUtil.cellStr(reader, 1, row));
+                target.setIndicatorName(ExcelReadUtil.cellStr(reader, 3, row));
+                target.setTargetValue(ExcelReadUtil.cellStr(reader, 4, row));
+                target.setScoringStandard(ExcelReadUtil.cellStr(reader, 5, row));
+                target.setWeight(ExcelReadUtil.toBigDecimal(reader.readCellValue(6, row)));
                 // 判空处理
                 if (target.getId() == null) {
                     // 写入记录
@@ -259,20 +256,6 @@ public class ExcelImportService {
         }
     }
 
-    //
-    private void assertFile(byte[] bytes) {
-        // 判空处理
-        if (bytes == null || bytes.length == 0) {
-            // 校验失败抛异常
-            throw new BizException(ResultCode.BAD_REQUEST, "导入文件为空");
-        }
-        // 条件分支
-        if (bytes.length > MAX_FILE_SIZE) {
-            // 校验失败抛异常
-            throw new BizException(ResultCode.BAD_REQUEST, "导入文件过大（上限 5MB）");
-        }
-    }
-
     // 定位数据起始行：跳过模板顶部的标题与格式说明，返回表头行号。
      // 表头行包含「部门」「行类型」「序号」等列名；找不到时回退到第 1 行。
     private int findDataStartRow(ExcelReader reader, int lastRow) {
@@ -280,8 +263,8 @@ public class ExcelImportService {
         // 从第 0 行开始找表头
         for (int row = 0; row < lastRow; row++) {
 
-            String dept = cellStr(reader, 0, row);
-            String seq = cellStr(reader, 2, row);
+            String dept = ExcelReadUtil.cellStr(reader, 0, row);
+            String seq = ExcelReadUtil.cellStr(reader, 2, row);
             // 同时命中「部门」列与「序号」列即视为表头行
             if ("部门".equals(dept) && "序号".equals(seq)) {
 
@@ -294,35 +277,4 @@ public class ExcelImportService {
         return 1;
     }
 
-    //
-    private String cellStr(ExcelReader reader, int col, int row) {
-        Object v = reader.readCellValue(col, row);
-        return v == null ? null : String.valueOf(v).trim();
-    }
-
-    //
-    private BigDecimal toBigDecimal(Object v) {
-        // 判空处理
-        if (v == null) {
-            return null;
-        }
-        try {
-            return new BigDecimal(String.valueOf(v).trim());
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    //
-    private Integer toInteger(Object v) {
-        // 判空处理
-        if (v == null) {
-            return null;
-        }
-        try {
-            return (int) Double.parseDouble(String.valueOf(v).trim());
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
 }

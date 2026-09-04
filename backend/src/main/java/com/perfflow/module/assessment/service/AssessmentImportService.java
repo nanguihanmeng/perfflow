@@ -3,6 +3,7 @@ import cn.hutool.poi.excel.ExcelReader;
 import cn.hutool.poi.excel.ExcelUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.perfflow.common.api.ResultCode;
+import com.perfflow.common.excel.ExcelReadUtil;
 import com.perfflow.common.exception.BizException;
 import com.perfflow.module.assessment.entity.AssessmentRow;
 import com.perfflow.module.assessment.entity.AssessmentTable;
@@ -27,26 +28,13 @@ public class AssessmentImportService {
     private final AssessmentTableService tableService;
     private static final int DATA_START_ROW = 4;
     private static final int DATA_ROW_COUNT = 10;
-    private static final long MAX_FILE_SIZE = 5 * 1024 * 1024;
      // 加减分项（BONUS）指标分数为负数，其余为正数，负数不参与绝对值求和（绝对值只计正数行）。
     @Transactional
 
     // 执行业务处理
     public void importRows(Long tableId, byte[] bytes) {
 
-        // 判空处理
-        if (bytes == null || bytes.length == 0) {
-
-            // 校验失败抛异常
-            throw new BizException(ResultCode.BAD_REQUEST, "导入文件为空");
-        }
-
-        // 条件分支
-        if (bytes.length > MAX_FILE_SIZE) {
-
-            // 校验失败抛异常
-            throw new BizException(ResultCode.BAD_REQUEST, "导入文件过大（上限 5MB）");
-        }
+        ExcelReadUtil.assertFile(bytes);
 
         // 调用业务服务
         AssessmentTable t = tableService.getRequired(tableId);
@@ -80,15 +68,12 @@ public class AssessmentImportService {
 
                 int excelRow = DATA_START_ROW + i;
                 AssessmentRow r = rows.get(i);
-                String indicatorName = reader.readCellValue(3, excelRow) == null ? null
-                        : String.valueOf(reader.readCellValue(3, excelRow)).trim();
-                String workTarget = reader.readCellValue(5, excelRow) == null ? null
-                        : String.valueOf(reader.readCellValue(5, excelRow)).trim();
-                String scoreCriteria = reader.readCellValue(6, excelRow) == null ? null
-                        : String.valueOf(reader.readCellValue(6, excelRow)).trim();
-                BigDecimal baseScore = toBigDecimal(reader.readCellValue(4, excelRow));
+                String indicatorName = ExcelReadUtil.cellStr(reader, 3, excelRow);
+                String workTarget = ExcelReadUtil.cellStr(reader, 5, excelRow);
+                String scoreCriteria = ExcelReadUtil.cellStr(reader, 6, excelRow);
+                BigDecimal baseScore = ExcelReadUtil.toBigDecimal(reader.readCellValue(4, excelRow));
                 // 序号（B 列）用于校验，与行 seq 对应
-                Integer seqFromExcel = toInteger(reader.readCellValue(1, excelRow));
+                Integer seqFromExcel = ExcelReadUtil.toInteger(reader.readCellValue(1, excelRow));
                 // 指标名称必填（第 1 行起）；加减分项允许留空
                 if (i == 0 && (indicatorName == null || indicatorName.isEmpty())) {
 
@@ -171,33 +156,4 @@ public class AssessmentImportService {
         }
     }
 
-    // 读取单元格数值
-    private BigDecimal toBigDecimal(Object v) {
-
-        if (v == null) return null;
-
-        try {
-
-            return new BigDecimal(String.valueOf(v).trim());
-
-        } catch (NumberFormatException e) {
-
-            return null;
-        }
-    }
-
-    // 读取单元格整数
-    private Integer toInteger(Object v) {
-
-        if (v == null) return null;
-
-        try {
-
-            return (int) Double.parseDouble(String.valueOf(v).trim());
-
-        } catch (NumberFormatException e) {
-
-            return null;
-        }
-    }
 }
