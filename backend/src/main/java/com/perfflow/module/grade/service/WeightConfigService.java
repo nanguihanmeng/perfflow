@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.math.BigDecimal;
 import java.util.List;
 // 权重配置服务（管理员维护）。
 @Slf4j
@@ -16,6 +17,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class WeightConfigService {
 
+    private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
     private final WeightConfigMapper weightMapper;
     // 权重配置列表。
 
@@ -32,6 +34,7 @@ public class WeightConfigService {
     // 创建记录
     public Long create(WeightConfigReq req) {
 
+        validateWeights(req);
         WeightConfig config = new WeightConfig();
         config.setStaffLevel(req.getStaffLevel());
         config.setDeptWeight(req.getDeptWeight());
@@ -48,6 +51,8 @@ public class WeightConfigService {
 
     // 更新记录
     public void update(Long id, WeightConfigReq req) {
+
+        validateWeights(req);
 
         // 查询单条
         WeightConfig config = weightMapper.selectById(id);
@@ -66,5 +71,20 @@ public class WeightConfigService {
         // 更新记录
         weightMapper.updateById(config);
         log.info("更新权重配置: id={}", id);
+    }
+
+    // 校验权重：部门权重与个人权重均在 0-100 之间，且二者之和为 100。
+    private static void validateWeights(WeightConfigReq req) {
+        if (req.getDeptWeight() == null || req.getPersonalWeight() == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "权重不能为空");
+        }
+        if (req.getDeptWeight().compareTo(BigDecimal.ZERO) < 0 || req.getDeptWeight().compareTo(HUNDRED) > 0
+                || req.getPersonalWeight().compareTo(BigDecimal.ZERO) < 0
+                || req.getPersonalWeight().compareTo(HUNDRED) > 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "权重需在 0-100 之间");
+        }
+        if (req.getDeptWeight().add(req.getPersonalWeight()).compareTo(HUNDRED) != 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "部门权重与个人权重之和须等于 100");
+        }
     }
 }

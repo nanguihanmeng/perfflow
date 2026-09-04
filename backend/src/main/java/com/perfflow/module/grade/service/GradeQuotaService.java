@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.math.BigDecimal;
 import java.util.List;
 // 等级配额配置服务（运营管理部/管理员维护）。
 @Slf4j
@@ -16,6 +17,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class GradeQuotaService {
 
+    private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
     private final GradeQuotaConfigMapper quotaMapper;
     // 等级配额配置列表。
 
@@ -32,6 +34,9 @@ public class GradeQuotaService {
 
     // 创建记录
     public Long create(GradeQuotaReq req) {
+
+        // 校验各等级占比
+        validateRatios(req);
 
         // 统计数量
         Long exist = quotaMapper.selectCount(new QueryWrapper<GradeQuotaConfig>()
@@ -63,6 +68,9 @@ public class GradeQuotaService {
 
     // 更新记录
     public void update(Long id, GradeQuotaReq req) {
+
+        // 校验各等级占比
+        validateRatios(req);
 
         // 查询单条
         GradeQuotaConfig config = quotaMapper.selectById(id);
@@ -103,5 +111,21 @@ public class GradeQuotaService {
         // 删除记录
         quotaMapper.deleteById(id);
         log.info("删除等级配额配置: id={}", id);
+    }
+
+    // 校验等级占比：A/B/C/D 每项在 0-100 之间，且四项之和为 100。
+    private static void validateRatios(GradeQuotaReq req) {
+        BigDecimal[] ratios = {req.getGradeARatio(), req.getGradeBRatio(),
+                req.getGradeCRatio(), req.getGradeDRatio()};
+        BigDecimal sum = BigDecimal.ZERO;
+        for (BigDecimal ratio : ratios) {
+            if (ratio == null || ratio.compareTo(BigDecimal.ZERO) < 0 || ratio.compareTo(HUNDRED) > 0) {
+                throw new BizException(ResultCode.BAD_REQUEST, "各等级占比需在 0-100 之间");
+            }
+            sum = sum.add(ratio);
+        }
+        if (sum.compareTo(HUNDRED) != 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "A/B/C/D 等级占比之和须等于 100");
+        }
     }
 }

@@ -22,7 +22,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 // 等级联动计算服务。
 @Slf4j
 @Service
@@ -46,15 +50,15 @@ public class GradeCalculationService {
         try {
 
             autoCalculate(periodId);
-            // 发送站内通知
-            notificationService.send(null, "等级自动计算完成",
+            // 发送站内通知给绩效考核管理员
+            notificationService.sendToRole(RoleConst.ROLE_PERFORMANCE_HR, "等级自动计算完成",
                     "周期 " + periodId + " 的等级已自动计算完成，请查看结果", "SYSTEM");
 
         } catch (Exception e) {
 
             log.error("异步等级计算失败: periodId={}", periodId, e);
-            // 发送站内通知
-            notificationService.send(null, "等级自动计算失败",
+            // 发送站内通知给绩效考核管理员
+            notificationService.sendToRole(RoleConst.ROLE_PERFORMANCE_HR, "等级自动计算失败",
                     "周期 " + periodId + " 的等级自动计算失败，请检查数据", "SYSTEM");
         }
     }
@@ -69,6 +73,16 @@ public class GradeCalculationService {
         List<DeptAssessment> deptAssessments = deptAssessmentMapper.selectList(
                 new QueryWrapper<DeptAssessment>().eq("period_id", periodId));
 
+        // 批量加载被考核人角色，供员工层级判定，避免逐表查询
+        Map<Long, String> roleByUserId = new HashMap<>();
+        List<Long> userIds = tables.stream().map(AssessmentTable::getUserId)
+                .filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        if (!userIds.isEmpty()) {
+            for (SysUser u : userMapper.selectBatchIds(userIds)) {
+                roleByUserId.put(u.getId(), u.getRole());
+            }
+        }
+
         for (AssessmentTable t : tables) {
 
             DeptAssessment dept = findDeptAssessment(deptAssessments, t.getDeptId());
@@ -80,7 +94,7 @@ public class GradeCalculationService {
             }
 
             // 解析员工层级
-            String staffLevel = resolveStaffLevel(t);
+            String staffLevel = resolveStaffLevel(t, roleByUserId);
             // 查询单条
             GradeQuotaConfig quota = quotaMapper.selectOne(new QueryWrapper<GradeQuotaConfig>()
                     .eq("dept_grade", dept.getDeptGrade())
@@ -92,25 +106,37 @@ public class GradeCalculationService {
 
                 continue;
             }
-            // 3. 写部门等级与权重快照
-            WeightConfig weight = weightMapper.selectOne(new QueryWrapper<WeightConfig>()
-                    .eq("staff_level", staffLevel)
-                    .orderByDesc("id").last("LIMIT 1"));
+            // 3. 写部门等级冗余（BASIC 与 MIDDLE 均写，供按部门排名定位）
             t.setDeptGrade(dept.getDeptGrade());
 
-            // 非空才处理
-            if (weight != null) {
+            // 4. 仅中层（部门领导）混算部门分：final = (部门分×部门权重 + 个人分×个人权重) / 100。
+            // 个人分恒由 self/leader 子项重算（与考核收口 finalizeWithLeaderScore 同口径），不读回 final_score——
+            // final_score 可能已是历史混算结果，读回会把已叠加的部门分再当个人分二次叠加；
+            // 部门总分更新后重复触发，可基于最新部门分正确刷新（FINISHED 终态不可改，个人分子项不会变）。
+            if (LEVEL_MIDDLE.equals(staffLevel)) {
 
-                t.setDeptScoreWeight(weight.getDeptWeight());
-                t.setPersonalScoreWeight(weight.getPersonalWeight());
-                // 4. 中层权重匹配：final = (dept.total×deptWeight + self×personalWeight)/100
-                if (LEVEL_MIDDLE.equals(staffLevel) && t.getFinalScore() != null) {
+                // 查询单条
+                WeightConfig weight = weightMapper.selectOne(new QueryWrapper<WeightConfig>()
+                        .eq("staff_level", staffLevel)
+                        .orderByDesc("id").last("LIMIT 1"));
 
-                    BigDecimal deptPart = dept.getTotalScore().multiply(weight.getDeptWeight());
-                    BigDecimal personalPart = t.getFinalScore().multiply(weight.getPersonalWeight());
-                    BigDecimal weighted = deptPart.add(personalPart)
-                            .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-                    t.setFinalScore(weighted);
+                // 非空才处理
+                if (weight != null) {
+
+                    // 权重快照与最终分同源同写，避免出现快照与结果不一致
+                    t.setDeptScoreWeight(weight.getDeptWeight());
+                    t.setPersonalScoreWeight(weight.getPersonalWeight());
+                    BigDecimal personal = personalComposite(t);
+
+                    // 非空才处理
+                    if (personal != null && dept.getTotalScore() != null) {
+
+                        BigDecimal deptPart = dept.getTotalScore().multiply(weight.getDeptWeight());
+                        BigDecimal personalPart = personal.multiply(weight.getPersonalWeight());
+                        BigDecimal weighted = deptPart.add(personalPart)
+                                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                        t.setFinalScore(weighted);
+                    }
                 }
             }
 
@@ -119,11 +145,12 @@ public class GradeCalculationService {
         }
 
         // 5. 按部门分组计算名额并填充等级
-        assignGradesByDept(tables, periodId);
+        assignGradesByDept(tables, periodId, roleByUserId);
         log.info("等级自动计算完成: periodId={}, 处理考核表数={}", periodId, tables.size());
     }
 
-    private void assignGradesByDept(List<AssessmentTable> tables, Long periodId) {
+    private void assignGradesByDept(List<AssessmentTable> tables, Long periodId,
+                                    Map<Long, String> roleByUserId) {
         // 按 dept_id 分组
         java.util.Map<Long, List<AssessmentTable>> byDept = new java.util.HashMap<>();
 
@@ -149,7 +176,7 @@ public class GradeCalculationService {
             for (AssessmentTable t : deptTables) {
 
                 // 解析员工层级
-                byLevel.computeIfAbsent(resolveStaffLevel(t), k -> new java.util.ArrayList<>()).add(t);
+                byLevel.computeIfAbsent(resolveStaffLevel(t, roleByUserId), k -> new java.util.ArrayList<>()).add(t);
             }
 
             for (java.util.Map.Entry<String, List<AssessmentTable>> levelEntry : byLevel.entrySet()) {
@@ -259,17 +286,32 @@ public class GradeCalculationService {
      // 部门领导(DEPT_LEAD) → MIDDLE（最终分=部门分×权重+个人分×权重）；
      // 员工等其余角色 → BASIC。
 
-    private String resolveStaffLevel(AssessmentTable t) {
+    private String resolveStaffLevel(AssessmentTable t, Map<Long, String> roleByUserId) {
 
-        // 查询单条
-        SysUser u = t.getUserId() == null ? null : userMapper.selectById(t.getUserId());
+        // 取用户角色（已批量预加载，避免逐表查询）
+        String role = t.getUserId() == null ? null : roleByUserId.get(t.getUserId());
 
         // 非空才处理
-        if (u != null && RoleConst.ROLE_DEPT_LEAD.equals(u.getRole())) {
+        if (RoleConst.ROLE_DEPT_LEAD.equals(role)) {
 
             return LEVEL_MIDDLE;
         }
 
         return LEVEL_BASIC;
+    }
+
+    // 个人最终分 = 自评总分×50% + 领导评分×50%（与考核收口 finalizeWithLeaderScore 同口径）。
+    // 仅当存在领导评分时参与混算，缺失（异常数据）则跳过混算，最终分保持个人分。
+    private BigDecimal personalComposite(AssessmentTable t) {
+
+        if (t.getLeaderScore() == null) {
+
+            return null;
+        }
+        BigDecimal self = t.getSelfTotalScore() == null ? BigDecimal.ZERO : t.getSelfTotalScore();
+
+        return self.multiply(BigDecimal.valueOf(0.5))
+                .add(t.getLeaderScore().multiply(BigDecimal.valueOf(0.5)))
+                .setScale(2, RoundingMode.HALF_UP);
     }
 }
