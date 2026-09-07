@@ -20,8 +20,10 @@ import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
-// 周期级考核明细导入（绩效考核管理员发布周期时用）。
- // 导入后：按登录名匹配 EMP 员工 → 生成主表 + 10 行模板 → 写入考核明细。
+/**
+ * 周期级考核明细导入（绩效考核管理员发布周期时使用）：按登录名匹配 EMP 员工，
+ * 先为员工生成考核主表与 10 行模板，再写入 Excel 明细。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -30,10 +32,13 @@ public class PeriodImportService {
     private static final int ROWS_PER_EMPLOYEE = 10;
     private final SysUserMapper userMapper;
     private final AssessmentTableService tableService;
-    // 导入周期考核明细，返回参与考核的员工 ID 列表。
+    /**
+     * 导入周期考核明细：按"员工名所在行 + 后续 10 行明细"划分数据块，
+     * 每个块匹配 EMP 员工并写入其考核表，返回参与考核的员工 ID 列表。
+     * @param period 目标考核周期
+     * @param bytes Excel 文件字节流
+     */
     @Transactional
-
-    // 执行业务处理
     public List<Long> importPeriod(AssessmentPeriod period, byte[] bytes) {
 
         // 构建集合容器

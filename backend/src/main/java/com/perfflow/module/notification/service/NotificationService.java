@@ -12,7 +12,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.Collections;
 import java.util.List;
-// 站内通知服务：发送 / 我的通知列表 / 标记已读。
+/**
+ * 站内通知服务：支持按用户或按角色发送通知、查询我的通知列表、标记已读与未读数统计。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -21,10 +23,14 @@ public class NotificationService {
     private static final int STATUS_ENABLED = 1;
     private final NotificationMapper notificationMapper;
     private final SysUserMapper userMapper;
-    // 发送站内通知。
+    /**
+     * 向单个用户发送站内通知。
+     * @param targetUserId 接收人用户 ID
+     * @param title 通知标题
+     * @param content 通知内容
+     * @param type 通知类型，为空时默认 SYSTEM
+     */
     @Transactional(rollbackFor = Exception.class)
-
-    // 执行业务处理
     public void send(Long targetUserId, String title, String content, String type) {
 
         // 判空处理

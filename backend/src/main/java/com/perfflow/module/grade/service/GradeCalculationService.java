@@ -27,7 +27,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
-// 等级联动计算服务。
+/**
+ * 等级联动计算服务：周期结束时按部门考核等级与人员层级配额，为已完成个人考核计算最终分并填充等级；
+ * 部门领导（中层）最终分按部门分与个人分加权混合计算。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -41,10 +44,11 @@ public class GradeCalculationService {
     private final WeightConfigMapper weightMapper;
     private final SysUserMapper userMapper;
     private final NotificationService notificationService;
-    // 对某周期执行等级自动计算（运营管理部触发）。
+    /**
+     * 异步执行周期等级自动计算（运营管理部触发），完成后站内信通知绩效考核管理员。
+     * @param periodId 考核周期 ID
+     */
     @Transactional(rollbackFor = Exception.class)
-    // 对指定周期执行等级自动计算。
-    // 异步执行等级自动计算，完成后站内信通知绩效考核管理员
     @Async("asyncExecutor")
     public void autoCalculateAsync(Long periodId) {
         try {

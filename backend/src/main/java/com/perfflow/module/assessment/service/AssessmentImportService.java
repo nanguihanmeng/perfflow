@@ -16,9 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
 import java.util.List;
-// 考核明细导入（仅 HR）。
- // 第 4 行为表头，第 5-14 行为 10 行数据，列：B=序号、C=指标类别、D=指标名称、
- // E=指标分数、F=工作目标、G=评分标准。按序号(1-10)覆盖写入 assessment_row，幂等。
+/**
+ * 个人考核明细导入服务（仅 HR 使用）：Excel 第 4 行为表头、第 5-14 行为 10 行数据，
+ * 按序号(1-10)覆盖写入 assessment_row，重复导入幂等。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -28,10 +29,13 @@ public class AssessmentImportService {
     private final AssessmentTableService tableService;
     private static final int DATA_START_ROW = 4;
     private static final int DATA_ROW_COUNT = 10;
-     // 加减分项（BONUS）指标分数为负数，其余为正数，负数不参与绝对值求和（绝对值只计正数行）。
+    /**
+     * 导入个人考核明细（仅自评中状态可操作）：按行校验序号与模板一致、指标分数非空非 0，
+     * 正数指标分数之和须等于 100（满分）；负数视为加减分项不计入正数合计。
+     * @param tableId 个人考核主表 ID
+     * @param bytes Excel 文件字节流
+     */
     @Transactional
-
-    // 执行业务处理
     public void importRows(Long tableId, byte[] bytes) {
 
         ExcelReadUtil.assertFile(bytes);

@@ -14,7 +14,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import java.util.ArrayList;
 import java.util.List;
-// 系统部门服务：部门列表、创建、修改、删除。
+/**
+ * 系统部门服务：部门列表、创建、修改与删除；删除前校验无子部门且无在编用户。
+ */
 @Service
 @RequiredArgsConstructor
 public class SysDeptService {

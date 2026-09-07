@@ -25,8 +25,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
-// 解析 Authorization 头中的 Bearer Token，写入 SecurityContext 与 DataScopeContext。
- // 否则判定为旧设备令牌（账号已在其他设备登录），返回 401。
+/**
+ * 请求鉴权过滤器：解析 Authorization 头中的 Bearer Token，校验通过后将用户身份写入
+ * SecurityContext 与 DataScopeContext；令牌版本号落后于库内时判定为旧设备令牌，返回 401。
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor

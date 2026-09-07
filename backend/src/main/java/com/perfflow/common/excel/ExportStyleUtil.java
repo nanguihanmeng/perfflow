@@ -15,8 +15,10 @@ import java.awt.Color;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-// Web 风格 Excel 导出通用样式工具。
-
+/**
+ * Web 风格 Excel 导出样式工具：封装模块标题、表头、数据、说明等单元格样式，
+ * 以及装饰条、外框、合并单元格等布局操作；同类样式按 key 缓存复用，减少工作簿内重复样式对象。
+ */
 public final class ExportStyleUtil {
 
     private static final Color MODULE_TITLE_BG = new Color(0x1F, 0x4E, 0x79);
@@ -67,6 +69,9 @@ public final class ExportStyleUtil {
         }
     }
 
+    /**
+     * 写入一行数据单元格：数值类型以数值形式写入便于汇总，其余以文本写入，套用 data 样式。
+     */
     public void writeDataRow(int row, Object[] texts) {
 
         for (int col = 0; col < texts.length; col++) {
@@ -144,6 +149,11 @@ public final class ExportStyleUtil {
         }
     }
 
+    /**
+     * 设置指定列的宽度。
+     * @param col 列下标（从 0 开始）
+     * @param width 列宽（以字符为单位，内部换算为 POI 的 1/256 字符单位）
+     */
     public void setColumnWidth(int col, int width) {
 
         sheet.setColumnWidth(col, width * 256);

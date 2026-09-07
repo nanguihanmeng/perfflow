@@ -11,7 +11,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.util.List;
-// Excel 模板导出服务（个人/部门填报模板）。
+/**
+ * Excel 模板导出服务：生成个人/部门考核填报模板，部门模板支持回填已保存的 KPI 指标行。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -31,8 +33,9 @@ public class ExcelTemplateService {
     private final DeptAssessmentMapper deptAssessmentMapper;
     // dept Kpi Row Mapper
     private final DeptKpiRowMapper deptKpiRowMapper;
-    // 导出个人考核填报模板。
-
+    /**
+     * 导出个人考核填报模板：仅含模块标题与指标填写表头，供用户按列填写后上传导入。
+     */
     public byte[] exportPersonalTemplate() {
 
         try (ExcelWriter writer = ExcelUtil.getWriter(true);
@@ -54,9 +57,11 @@ public class ExcelTemplateService {
         }
     }
 
-    // 导出部门考核填报模板。
-     // 未指定或考核不存在时仅导出表头。
-
+    /**
+     * 导出部门考核填报模板：在表头基础上回填该考核已保存的 KPI 行（部门列留空，导入时自动定位）；
+     * 未指定或考核不存在时仅导出表头与填写说明。
+     * @param assessmentId 部门考核主表 ID，可为空
+     */
     public byte[] exportDeptTemplate(Long assessmentId) {
 
         try (ExcelWriter writer = ExcelUtil.getWriter(true);

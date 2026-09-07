@@ -24,7 +24,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-// 系统用户服务：用户分页、创建、修改、删除、重置密码等。
+/**
+ * 系统用户服务：用户分页查询、参与考核人员选项、创建/修改/删除、重置密码与启用状态切换。
+ * 内置绩效考核管理员账号不可被管理员管理；已参与考核的用户禁止删除（可禁用）。
+ */
 @Service
 @RequiredArgsConstructor
 public class SysUserService {

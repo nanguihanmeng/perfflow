@@ -26,7 +26,10 @@ import java.io.ByteArrayOutputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-// 考核结果导出（仅 HR）。
+/**
+ * 考核结果导出服务（仅 HR 使用）：将已完成填报的主表导出为打印用 Excel（每表固定版式），
+ * 并提供同等内容的打印 HTML；未完成填报人员在导出件末尾以小字列出。
+ */
 @Service
 @RequiredArgsConstructor
 public class AssessmentExportService {
@@ -37,10 +40,11 @@ public class AssessmentExportService {
     private final SysUserMapper userMapper;
     private final SysDepartmentMapper deptMapper;
     private final AssessmentTableService tableService;
-    // 导出某周期已完成考核主表为 Excel（模板 A1:G16 格式），
-     // 未完成填报的人员在表格最下方以小字说明。
-
-     // 导出考核 Excel
+    /**
+     * 导出某周期已完成考核的主表为 Excel：按部门/人员顺序逐人成表，
+     * 未完成填报人员在表格最下方以小字列出。
+     * @param periodId 考核周期 ID
+     */
     public byte[] exportExcel(Long periodId) {
 
         // 校验必须指定周期
@@ -242,7 +246,10 @@ public class AssessmentExportService {
         style.setColumnWidth(8, 12);
     }
 
-    // 导出打印 HTML
+    /**
+     * 生成与 Excel 同等内容的打印 HTML（含打印按钮样式），供浏览器直接打印。
+     * @param periodId 考核周期 ID
+     */
     public String exportPrintHtml(Long periodId) {
 
         // 校验必须指定周期

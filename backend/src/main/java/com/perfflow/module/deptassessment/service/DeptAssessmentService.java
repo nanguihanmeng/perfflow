@@ -35,33 +35,32 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-//
- // 部门考核服务：KPI 填报、复核、初审、审批、部门等级自动计算。
- //
-
- //
+/**
+ * 部门考核服务：负责部门 KPI 指标填报与实际值录入、部门负责人复核、绩效初审与审批，
+ * 并自动完成部门得分汇总与等级计算。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class DeptAssessmentService {
 
-    //
+
     public static final String ROW_TYPE_KPI = "经营业绩";
     public static final String ROW_TYPE_OPERATION = "运营指标";
     public static final String ROW_TYPE_KEY_WORK = "重点工作";
-    //
+
     private static final int KPI_ROW_COUNT = 3;
     private static final int OPERATION_ROW_COUNT = 2;
     private static final int KEY_WORK_ROW_COUNT = 2;
-    //
+
     private static final int PERIOD_STATUS_OPEN = 1;
-    //
+
     private static final BigDecimal RATIO_CAP = BigDecimal.ONE;
-    //
+
     private static final int RATIO_SCALE = 4;
-    //
+
     private static final int SCORE_SCALE = 2;
-    //
+
     private static final double GRADE_A_THRESHOLD = 90;
     private static final double GRADE_B_THRESHOLD = 75;
     private static final double GRADE_C_THRESHOLD = 60;
@@ -71,11 +70,10 @@ public class DeptAssessmentService {
     private final SysDepartmentMapper deptMapper;
     private final DeptAssessmentStateMachine stateMachine;
     private final DeptAssessmentFlowService flowService;
-    //
-     // 原子条件更新：仅当仍处于期望状态才流转，防并发重复提交。
-     //
-
-     //
+    /**
+     * 原子条件更新：仅当考核仍处于 fromStatus 时才置为 toStatus，避免并发重复流转；
+     * 返回是否更新成功。
+     */
     private boolean transitionStatus(Long assessmentId, DeptAssessmentState fromStatus,
                                      DeptAssessmentState toStatus,
                                      Consumer<LambdaUpdateWrapper<DeptAssessment>> extraSetter) {
@@ -100,13 +98,8 @@ public class DeptAssessmentService {
         }
     }
 
-    //
      // 部门类周期开启时，为勾选部门（或全部部门）生成部门考核主表 + KPI 行模板。
-     //
 
-     //
-
-     //
     @Transactional(rollbackFor = Exception.class)
     public void initForPeriod(AssessmentPeriod period, List<Long> deptIds) {
         QueryWrapper<SysDepartment> qw = new QueryWrapper<>();
@@ -132,13 +125,8 @@ public class DeptAssessmentService {
                 period.getId(), depts.size(), depts.size());
     }
 
-    //
      // 查询本部门可填报的部门考核选项（仅 HR 已开启的部门线周期）。
-     //
 
-     //
-
-     //
     public List<DeptAssessmentOptionResp> listOptions(Long deptId) {
         // 查询列表
         List<AssessmentPeriod> periods = periodMapper.selectList(new QueryWrapper<AssessmentPeriod>()
@@ -165,13 +153,8 @@ public class DeptAssessmentService {
         return out;
     }
 
-    //
      // 按主表ID查询部门考核详情（含 KPI 行）。
-     //
 
-     //
-
-     //
     public DeptAssessmentResp getById(Long id) {
         // 加载实体并校验存在
         DeptAssessment assessment = requiredById(id);
@@ -181,14 +164,9 @@ public class DeptAssessmentService {
         return toResp(assessment);
     }
 
-    //
      // 部门绩效专员提交本部门 KPI 实际完成值（自评中 → 待复核）。
-     //
-
      // 得分在提交时由系统按完成率自动重算。
-     //
 
-     //
     @Transactional(rollbackFor = Exception.class)
     public void submit(Long assessmentId, DeptActualValueReq req) {
         // 加载考核主表并校验专员归属与周期状态
@@ -219,11 +197,8 @@ public class DeptAssessmentService {
         log.info("部门绩效专员提交部门考核: assessmentId={}, deptId={}", assessmentId, assessment.getDeptId());
     }
 
-    //
      // 部门负责人复核（待复核 → 待初审 / 退回自评中）。
-     //
 
-     //
     @Transactional(rollbackFor = Exception.class)
     public void review(Long assessmentId, boolean approve, String comment) {
         // 加载实体并校验存在
@@ -255,11 +230,8 @@ public class DeptAssessmentService {
         log.info("部门负责人复核通过: assessmentId={}, deptId={}", assessmentId, assessment.getDeptId());
     }
 
-    //
      // 运营管理部初审（待初审 → 待审批 / 退回整改）。
-     //
 
-     //
     @Transactional(rollbackFor = Exception.class)
     public void audit(Long assessmentId, boolean approve, String comment) {
         // 权限或数据校验
@@ -290,11 +262,8 @@ public class DeptAssessmentService {
         log.info("运营管理部初审通过: assessmentId={}, deptId={}", assessmentId, assessment.getDeptId());
     }
 
-    //
      // 绩效委员会最终审批（待审批 → 已完成，触发部门等级计算）。
-     //
 
-     //
     @Transactional(rollbackFor = Exception.class)
     public void approve(Long assessmentId) {
         // 权限或数据校验
@@ -328,13 +297,8 @@ public class DeptAssessmentService {
                 assessmentId, assessment.getDeptId(), total, grade);
     }
 
-    //
      // 部门考核进度列表（运营管理部/委员会/绩效管理员看板用）。
-     //
 
-     //
-
-     //
     public List<DeptAssessmentResp> listAll() {
         QueryWrapper<DeptAssessment> qw = new QueryWrapper<>();
         // 取当前用户上下文
@@ -387,13 +351,8 @@ public class DeptAssessmentService {
         return out;
     }
 
-    //
      // 计算单行得分：得分 = min(实际完成值/目标值, 1) × 权重，保留 2 位小数。
-     //
 
-     //
-
-     //
     static BigDecimal calcRowScore(String targetValue, String actualValue, BigDecimal weight) {
         // 权重缺失直接记 0 分
         if (weight == null) {
@@ -414,7 +373,7 @@ public class DeptAssessmentService {
     }
 
     // ==================== 内部方法 ====================
-    //
+
     private DeptAssessment initAssessment(Long periodId, Long deptId) {
         DeptAssessment assessment = new DeptAssessment();
         assessment.setPeriodId(periodId);
@@ -433,7 +392,6 @@ public class DeptAssessmentService {
         return assessment;
     }
 
-    //
     private void initDefaultRows(Long assessmentId) {
         insertRowTemplate(assessmentId, ROW_TYPE_KPI, 1);
         insertRowTemplate(assessmentId, ROW_TYPE_KPI, 2);
@@ -444,7 +402,6 @@ public class DeptAssessmentService {
         insertRowTemplate(assessmentId, ROW_TYPE_KEY_WORK, 7);
     }
 
-    //
     private void insertRowTemplate(Long assessmentId, String rowType, int seqNo) {
         DeptKpiRow row = new DeptKpiRow();
         row.setDeptAssessmentId(assessmentId);
@@ -454,7 +411,6 @@ public class DeptAssessmentService {
         kpiRowMapper.insert(row);
     }
 
-    //
     private void saveActualValues(Long assessmentId, List<DeptActualValueRowReq> rows) {
         // 判空处理
         if (rows == null || rows.isEmpty()) {
@@ -478,7 +434,6 @@ public class DeptAssessmentService {
         }
     }
 
-    //
     private void recalcScores(Long assessmentId) {
         // 查询列表
         List<DeptKpiRow> rows = kpiRowMapper.selectList(
@@ -493,7 +448,6 @@ public class DeptAssessmentService {
         }
     }
 
-    //
     private void rollbackToFilling(DeptAssessment assessment, String comment, String action) {
         // 原子状态流转
         boolean ok = transitionStatus(assessment.getId(),
@@ -504,7 +458,6 @@ public class DeptAssessmentService {
         log.info("{}: assessmentId={}, comment={}", action, assessment.getId(), comment);
     }
 
-    //
     private BigDecimal calcTotalScore(Long assessmentId) {
         // 查询列表
         List<DeptKpiRow> rows = kpiRowMapper.selectList(
@@ -539,7 +492,6 @@ public class DeptAssessmentService {
         return kpi.add(operation).add(keyWork).add(bonus);
     }
 
-    //
     private String gradeOf(BigDecimal total) {
         double v = total.doubleValue();
         if (v >= GRADE_A_THRESHOLD) return "A";
@@ -548,7 +500,6 @@ public class DeptAssessmentService {
         return "D";
     }
 
-    //
     private AssessmentPeriod requireOpenPeriod(Long periodId) {
         // 查询单条
         AssessmentPeriod period = periodMapper.selectById(periodId);
@@ -560,7 +511,6 @@ public class DeptAssessmentService {
         return period;
     }
 
-    //
     private DeptAssessment requiredById(Long id) {
         // 查询单条
         DeptAssessment assessment = deptAssessmentMapper.selectById(id);
@@ -572,7 +522,6 @@ public class DeptAssessmentService {
         return assessment;
     }
 
-    //
     private DeptAssessment findAssessment(Long periodId, Long deptId) {
         // 查询单条
         return deptAssessmentMapper.selectOne(new QueryWrapper<DeptAssessment>()
@@ -581,7 +530,6 @@ public class DeptAssessmentService {
                 .last("LIMIT 1"));
     }
 
-    //
     private void assertDeptStaff(Long deptId) {
         // 取当前用户上下文
         String role = DataScopeContext.current().getPrimaryRole();
@@ -599,7 +547,6 @@ public class DeptAssessmentService {
         }
     }
 
-    //
     private void assertDeptLead(Long deptId) {
         // 取当前用户上下文
         String role = DataScopeContext.current().getPrimaryRole();
@@ -617,7 +564,6 @@ public class DeptAssessmentService {
         }
     }
 
-    //
     private void assertOperation() {
         // 取当前用户上下文
         String role = DataScopeContext.current().getPrimaryRole();
@@ -628,7 +574,6 @@ public class DeptAssessmentService {
         }
     }
 
-    //
     private void assertCommittee() {
         // 取当前用户上下文
         String role = DataScopeContext.current().getPrimaryRole();
@@ -639,7 +584,6 @@ public class DeptAssessmentService {
         }
     }
 
-    //
     private void assertViewPermission(Long deptId) {
         // 取当前用户上下文
         String role = DataScopeContext.current().getPrimaryRole();
@@ -656,7 +600,6 @@ public class DeptAssessmentService {
         }
     }
 
-    //
     private boolean isDeptLinePeriod(AssessmentPeriod period) {
         // 判空处理
         if (period.getPeriodType() == null) {
@@ -670,7 +613,6 @@ public class DeptAssessmentService {
         }
     }
 
-    //
     private DeptAssessmentOptionResp toOptionResp(AssessmentPeriod p, DeptAssessment a) {
         DeptAssessmentOptionResp resp = new DeptAssessmentOptionResp();
         resp.setAssessmentId(a.getId());
@@ -691,7 +633,6 @@ public class DeptAssessmentService {
         return resp;
     }
 
-    //
     private DeptAssessmentResp toResp(DeptAssessment d) {
         // 查询单条
         SysDepartment dept = deptMapper.selectById(d.getDeptId());
@@ -724,7 +665,6 @@ public class DeptAssessmentService {
         return resp;
     }
 
-    //
     private List<DeptKpiRowResp> listRowResps(Long assessmentId) {
         // 查询列表
         List<DeptKpiRow> rows = kpiRowMapper.selectList(
@@ -763,7 +703,6 @@ public class DeptAssessmentService {
         return resp;
     }
 
-    //
     private static BigDecimal toDecimal(String value) {
         // 判空处理
         if (value == null || value.trim().isEmpty()) {

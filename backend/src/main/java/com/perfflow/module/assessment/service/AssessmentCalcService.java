@@ -10,18 +10,21 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
-// 考核计算服务：负责单行自评分、自评总分、最终得分、等级。
-// 纯计算，不读权限。
+/**
+ * 考核计算服务：负责单行自评分、自评总分、最终得分与等级的计算。
+ * 纯计算逻辑，不读取权限、不依赖当前用户上下文。
+ */
 @Service
 @RequiredArgsConstructor
 public class AssessmentCalcService {
 
     private final AssessmentRowMapper rowMapper;
     private final AssessmentTableMapper tableMapper;
-    // 计算单行 self_score = base_score * completion_rate / 100（保留 2 位小数）。
-     // 调整「自评得分」时作为减分录入，默认不得自动计为负分。
-
-    // 执行业务处理
+    /**
+     * 计算单行自评分：self_score = base_score * completion_rate / 100，保留 2 位小数。
+     * @param baseScore 指标分数
+     * @param completionRate 完成率（百分比数值）
+     */
     public static BigDecimal calcSelfScore(BigDecimal baseScore, BigDecimal completionRate) {
 
         if (baseScore == null || completionRate == null){ return null;}
@@ -29,12 +32,11 @@ public class AssessmentCalcService {
         return score.setScale(2, RoundingMode.HALF_UP);
     }
 
-    // 重算整张主表的自评总分并写入。
-     // self_score 由调用方按场景决定：
+    /**
+     * 重算整张主表的自评总分并落库。行级 self_score 由调用方按场景先写入，这里只负责求和。
+     * @param table 个人考核主表（需含 id）
+     */
     @Transactional
-    // 执行 recalc。
-
-    // 执行业务处理
     public AssessmentTable recalc(AssessmentTable table) {
 
         // 判空处理
@@ -65,11 +67,12 @@ public class AssessmentCalcService {
         return table;
     }
 
-    // 按完成率重算表中各行 self_score，并重算总分。
+    /**
+     * 按完成率重算全部普通行 self_score 后重算总分；加减分项(BONUS)固定记 0 分，
+     * 避免自动把负数指标记成负分。
+     * @param table 个人考核主表
+     */
     @Transactional
-    // 执行 recalcByCompletionRate。
-
-    // 执行业务处理
     public AssessmentTable recalcByCompletionRate(AssessmentTable table) {
 
         // 查询列表
@@ -97,11 +100,12 @@ public class AssessmentCalcService {
         return recalc(table);
     }
 
-    // 写入领导评分后计算 final_score 与 grade。
+    /**
+     * 写入领导评分并计算最终得分与等级：最终得分按自评总分与领导评分各半权重加权。
+     * @param table 个人考核主表
+     * @param leaderScore 领导评分（满分制，须在允许取值范围内）
+     */
     @Transactional
-    // 执行 finalizeWithLeaderScore。
-
-    // 执行业务处理
     public AssessmentTable finalizeWithLeaderScore(AssessmentTable table, BigDecimal leaderScore) {
 
         if (leaderScore == null || leaderScore.compareTo(BigDecimal.ZERO) < 0
@@ -124,7 +128,10 @@ public class AssessmentCalcService {
         return table;
     }
 
-    // 执行业务处理
+    /**
+     * 按最终得分高低映射考核等级（A/B/C/D）。
+     * @param finalScore 最终得分
+     */
     public static String gradeOf(BigDecimal finalScore) {
 
         if (finalScore == null){ return null;}

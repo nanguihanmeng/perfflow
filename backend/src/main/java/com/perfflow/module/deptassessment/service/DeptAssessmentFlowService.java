@@ -17,7 +17,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-// 部门考核流程日志服务。
+/**
+ * 部门考核流程日志服务：记录各流转动作的操作人与操作内容，供审计留痕与前端展示流转轨迹。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -31,9 +33,15 @@ public class DeptAssessmentFlowService {
     public static final String ACTION_APPROVE = "APPROVE";
     private final DeptAssessmentFlowLogMapper logMapper;
     private final SysUserMapper userMapper;
-    // 写入一条流程日志。
+    /**
+     * 写入一条部门考核流程日志，操作人与操作角色取自当前请求上下文。
+     * @param assessment 部门考核主表
+     * @param from 流转前状态
+     * @param to 流转后状态
+     * @param action 动作标识（SUBMIT / REVIEW_PASS 等）
+     * @param comment 处理说明或退回原因
+     */
     @Transactional(rollbackFor = Exception.class)
-    // 写入流程日志。
     public void writeLog(DeptAssessment assessment, DeptAssessmentState from,
 
                          DeptAssessmentState to, String action, String comment) {
@@ -56,7 +64,10 @@ public class DeptAssessmentFlowService {
                 assessment.getId(), from, to, action, opId, role);
     }
 
-    // 查询流程日志
+    /**
+     * 查询某部门考核的流程日志（按时间正序），并回填经办人真实姓名。
+     * @param assessmentId 部门考核主表 ID
+     */
     public List<DeptFlowLogResp> listLogs(Long assessmentId) {
 
         // 查询列表

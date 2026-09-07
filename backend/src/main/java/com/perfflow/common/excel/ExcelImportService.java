@@ -28,12 +28,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-//
- // Excel 数据导入服务（个人考核 / 部门考核）。
- //
-
- // 得分由系统按完成率自动计算，实际完成值由绩效专员在页面填报，均不在 HR 导入中维护。
- //
+/**
+ * Excel 数据导入服务：支持个人考核指标与部门 KPI 指标的覆盖式导入。
+ * 得分由系统按完成率自动计算、实际完成值由绩效专员在页面填报，均不在此处维护。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -45,11 +43,11 @@ public class ExcelImportService {
     private final SysDepartmentMapper deptMapper;
     private final AssessmentPeriodMapper periodMapper;
 
-    //
-     // 导入个人考核数据，按 tableId + seq 覆盖写行。
-     //
-
-     //
+    /**
+     * 导入个人考核指标：按 tableId + seq 覆盖更新已存在的指标行，跳过序号为空或未匹配到行的记录。
+     * @param tableId 个人考核表 ID
+     * @param bytes Excel 文件字节流
+     */
     @Transactional(rollbackFor = Exception.class)
     public void importPersonal(Long tableId, byte[] bytes) {
         // 校验文件合法性
@@ -97,13 +95,12 @@ public class ExcelImportService {
         }
     }
 
-    //
-     // 导入单部门考核指标，按 assessmentId + seqNo 覆盖写行。
-     //
-
-     //
-
-     //
+    /**
+     * 导入单个部门考核的 KPI 指标：按 assessmentId + seqNo 覆盖写行，行不存在则新增；
+     * 仅"自评填报中"的考核允许导入，且只写指标相关列。
+     * @param assessmentId 部门考核主表 ID
+     * @param bytes Excel 文件字节流
+     */
     @Transactional(rollbackFor = Exception.class)
     public void importDept(Long assessmentId, byte[] bytes) {
         ExcelReadUtil.assertFile(bytes);
@@ -165,13 +162,12 @@ public class ExcelImportService {
         }
     }
 
-    //
-     // 按周期批量导入部门考核指标。
-     //
-
-     //
-
-     //
+    /**
+     * 按考核周期批量导入各部门 KPI 指标：按部门名匹配考核主表后以部门 + seqNo 覆盖写行；
+     * 自动跳过非自评状态、找不到主表或序号为空的行。
+     * @param periodId 考核周期 ID
+     * @param bytes Excel 文件字节流
+     */
     @Transactional(rollbackFor = Exception.class)
     public void importDeptBatch(Long periodId, byte[] bytes) {
         ExcelReadUtil.assertFile(bytes);
@@ -256,8 +252,10 @@ public class ExcelImportService {
         }
     }
 
-    // 定位数据起始行：跳过模板顶部的标题与格式说明，返回表头行号。
-     // 表头行包含「部门」「行类型」「序号」等列名；找不到时回退到第 1 行。
+    /**
+     * 定位数据起始行：跳过模板顶部的标题与格式说明行。
+     * 表头行包含「部门」「序号」列名；找不到时回退到第 1 行开始。
+     */
     private int findDataStartRow(ExcelReader reader, int lastRow) {
 
         // 从第 0 行开始找表头

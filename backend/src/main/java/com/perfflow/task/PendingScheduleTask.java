@@ -15,11 +15,17 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-// 定时任务：
+/**
+ * 挂起相关定时任务：每天早上检查即将到期的自评挂起周期并输出提醒日志，
+ * 每晚对超期未处理的挂起主表自动推送到部门审核。
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class PendingScheduleTask {
+
+    /** 挂起结束前多少天内触发提醒日志。 */
+    private static final int REMINDER_DAYS = 3;
 
     private final AssessmentPeriodMapper periodMapper;
     private final AssessmentTableMapper tableMapper;
@@ -38,7 +44,7 @@ public class PendingScheduleTask {
 
             long days = ChronoUnit.DAYS.between(today, p.getSuspendEndDate());
 
-            if (days >= 0 && days <= 3) {
+            if (days >= 0 && days <= REMINDER_DAYS) {
 
                 log.info("[PerfFlow] 周期 {} 自评挂起将在 {} 天后结束", p.getName(), days);
             }

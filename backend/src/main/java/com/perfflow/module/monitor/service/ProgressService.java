@@ -15,13 +15,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-//
- // 考核进度统计服务（看板数据）。
- //
-
- //
-
- //
+/**
+ * 考核进度统计服务（看板数据）：按部门统计个人考核的已填报、已进入审核、挂起逾期等指标，
+ * 并汇总为全公司进度看板。
+ */
 @Service
 @RequiredArgsConstructor
 public class ProgressService {
@@ -30,11 +27,9 @@ public class ProgressService {
     private static final long OVERDUE_DAYS = 3L;
     private final AssessmentTableMapper tableMapper;
     private final SysDepartmentMapper deptMapper;
-    //
-     // 全公司进度看板。
-     //
-
-     //
+    /**
+     * 全公司进度看板：单次遍历考核表按部门累计填报/审核/逾期数据，完成率保留一位小数（百分比）。
+     */
     public ProgressResp dashboard() {
         // 查询列表
         List<AssessmentTable> tables = tableMapper.selectList(
@@ -107,11 +102,9 @@ public class ProgressService {
         return resp;
     }
 
-    //
-     // 是否逾期：挂起状态且提交时间距今超过逾期天数。
-     //
-
-     //
+    /**
+     * 是否逾期：挂起状态且提交时间距今已超过逾期天数阈值。
+     */
     private boolean isOverdue(AssessmentTable t) {
 
         // 判空处理
@@ -124,7 +117,6 @@ public class ProgressService {
         return duration.toDays() > OVERDUE_DAYS;
     }
 
-    //
     private static class DeptCounter {
         long total;
         long filled;

@@ -27,42 +27,38 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-//
- // 首页提醒服务：待办事项 + 挂起预警。
- //
-
- // 挂起预警仅针对进行中周期生成，已结束周期不再提示。
- //
+/**
+ * 首页提醒服务：按当前用户角色汇总个人线/部门线的待办事项，并生成自评挂起预警。
+ * 挂起预警仅针对进行中周期生成，已结束周期不再提示。
+ */
 @Service
 @RequiredArgsConstructor
 public class HomeService {
 
-    //
+
     private static final String TYPE_SUSPEND_SOON = "SUSPEND_SOON";
-    //
+
     private static final String BIZ_PERSONAL = "PERSONAL";
-    //
+
     private static final String BIZ_DEPT = "DEPT";
-    //
+
     private static final int SEVERITY_INFO = 1;
     private static final int SEVERITY_WARN = 2;
     private static final int SEVERITY_URGENT = 3;
-    //
+
     private static final int PERIOD_STATUS_OPEN = 1;
-    //
+
     private static final long SUSPEND_WARN_DAYS = 3L;
-    //
+
     private static final long SUSPEND_URGENT_DAYS = 1L;
     private final AssessmentTableMapper tableMapper;
     private final AssessmentPeriodMapper periodMapper;
     private final SysUserMapper userMapper;
     private final SysDepartmentMapper deptMapper;
     private final DeptAssessmentMapper deptAssessmentMapper;
-    //
 
-     //
 
-     //
+
     public RemindersResp load() {
         // 构造返回结构并取当前用户上下文
         RemindersResp out = new RemindersResp();
@@ -98,9 +94,7 @@ public class HomeService {
         return out;
     }
 
-    //
 
-     //
     private void loadPersonalTodos(String role, Long currentUid, Long currentDeptId,
                                    // 构建集合容器
                                    List<Long> activePeriodIds, Map<Long, String> periodNames,
@@ -159,9 +153,6 @@ public class HomeService {
         appendPersonalReminders(tableMapper.selectList(qw), periodNames, out, seen);
     }
 
-    //
-
-     //
     private void appendDeptReviewTodos(Long currentDeptId, List<Long> activePeriodIds,
                                        // 构建集合容器
                                        Map<Long, String> periodNames, RemindersResp out, Set<Long> seen) {
@@ -178,9 +169,7 @@ public class HomeService {
         appendPersonalReminders(tableMapper.selectList(qw), periodNames, out, seen);
     }
 
-    //
 
-     //
     private void loadDeptTodos(String role, Long currentDeptId, List<AssessmentPeriod> activePeriods,
                                RemindersResp out, Set<Long> seen) {
         String roleSafe = role == null ? "" : role;
@@ -229,9 +218,8 @@ public class HomeService {
         }
     }
 
-    //
      // 加载挂起预警：仅进行中周期且 HR/部门负责人可见。
-     //
+
     private void loadSuspendWarnings(String role, List<AssessmentPeriod> activePeriods, RemindersResp out) {
         String roleSafe = role == null ? "" : role;
         boolean visible = RoleConst.ROLE_PERFORMANCE_HR.equals(roleSafe) || RoleConst.ROLE_DEPT_LEAD.equals(roleSafe);
@@ -261,9 +249,8 @@ public class HomeService {
         }
     }
 
-    //
      // 组装个人考核待办提醒，标题含"谁、什么事"便于直接识别。
-     //
+
     private void appendPersonalReminders(List<AssessmentTable> tables, Map<Long, String> periodNames,
                                          RemindersResp out, Set<Long> seen) {
         // 判空处理
@@ -296,9 +283,8 @@ public class HomeService {
         }
     }
 
-    //
      // 组装部门考核待办提醒，标题含部门名与动作。
-     //
+
     private void appendDeptReminders(AssessmentPeriod period, List<DeptAssessment> list,
                                      RemindersResp out, Set<Long> seen) {
         // 判空处理
@@ -327,7 +313,6 @@ public class HomeService {
         }
     }
 
-    //
     private Map<Long, String> loadUserNames(List<AssessmentTable> tables) {
         // 构建集合容器
         Set<Long> userIds = new HashSet<>();
@@ -350,7 +335,6 @@ public class HomeService {
         return names;
     }
 
-    //
     private Map<Long, String> loadDeptNames(List<AssessmentTable> tables) {
         // 构建集合容器
         Set<Long> deptIds = new HashSet<>();
@@ -373,7 +357,6 @@ public class HomeService {
         return names;
     }
 
-    //
     private Map<Long, String> loadDeptNamesByDeptIds(List<DeptAssessment> list) {
         // 构建集合容器
         Set<Long> deptIds = new HashSet<>();
@@ -396,7 +379,6 @@ public class HomeService {
         return names;
     }
 
-    //
     private String buildWho(String realName, String deptName) {
         // 判空处理
         if (realName == null && deptName == null) {
@@ -413,7 +395,6 @@ public class HomeService {
         return " — " + realName + "（" + deptName + "）";
     }
 
-    //
     private boolean isDeptLinePeriod(AssessmentPeriod period) {
         // 判空处理
         if (period.getPeriodType() == null) {
@@ -426,7 +407,6 @@ public class HomeService {
         }
     }
 
-    //
     private String stateText(String s) {
         return switch (s) {
             case "SELF_DRAFTING" -> "请继续填报自评";
@@ -438,7 +418,6 @@ public class HomeService {
         };
     }
 
-    //
     private String deptStateText(Integer status) {
         // 判空处理
         if (status == null) {
@@ -467,7 +446,6 @@ public class HomeService {
         return "部门考核未开始";
     }
 
-    //
     private String deptStateType(Integer status) {
         return status == null ? "DEPT" : "DEPT_" + status;
     }

@@ -15,7 +15,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.stream.Collectors;
-// 评估数据权限 + 字段脱敏判定。
+/**
+ * 个人考核数据权限与字段脱敏判定服务：依据当前用户角色/部门，决定某张考核表是否可见、
+ * 某行可否编辑、得分字段是否脱敏，并为列表查询叠加可见性条件。
+ */
 @Service
 @RequiredArgsConstructor
 public class AssessmentPermissionService {
@@ -47,7 +50,11 @@ public class AssessmentPermissionService {
     // 执行业务处理
     public boolean isHr()      { return RoleConst.ROLE_PERFORMANCE_HR.equals(currentRole()); }
 
-    // 执行业务处理
+    /**
+     * 校验当前用户对指定考核表是否可见，不可见直接抛 FORBIDDEN。
+     * 自评挂起(待人事推送)阶段仅 HR 与本人可见；其余按角色规则放行。
+     * @param t 个人考核主表
+     */
     public void ensureVisible(AssessmentTable t) {
 
         String role = currentRole();
@@ -144,7 +151,12 @@ public class AssessmentPermissionService {
         }
     }
 
-    // 执行业务处理
+    /**
+     * 判断当前用户能否编辑指定行：员工仅在自评中可编辑本人普通(非加减分)行，
+     * 部门领导仅在待部门审核阶段可编辑本部门全部行。
+     * @param t 个人考核主表
+     * @param r 目标指标行
+     */
     public boolean canEditRow(AssessmentTable t, AssessmentRow r) {
 
         String role = currentRole();
@@ -178,7 +190,11 @@ public class AssessmentPermissionService {
         };
     }
 
-    // 执行业务处理
+    /**
+     * 判断该考核表对当前用户是否需要对得分类字段脱敏：
+     * 员工仅本人表可见分；部门领导可看本人与本部门；委员会仅对非 LEAD 的表脱敏。
+     * @param t 个人考核主表
+     */
     public boolean isRowMasked(AssessmentTable t) {
 
         String role = currentRole();
@@ -214,10 +230,11 @@ public class AssessmentPermissionService {
         }
     }
 
-    // 在主表 list 查询上叠加可见性条件。
-     // 返回 true 时调用方按当前用户筛选；false 表示已是全量（如 LEAD/HR）。
-
-    // 执行业务处理
+    /**
+     * 在列表查询上叠加当前用户的可见范围条件：员工仅本人，部门领导限本部门或本人，
+     * 委员会限 LEAD 的表或已完成结果，LEAD 过滤掉自评挂起阶段；返回叠加后的查询包装器。
+     * @param qw 待叠加条件的查询包装器
+     */
     public QueryWrapper<AssessmentTable> scopeOf(QueryWrapper<AssessmentTable> qw) {
 
         String role = currentRole();
@@ -288,7 +305,10 @@ public class AssessmentPermissionService {
         }
     }
 
-    // 执行业务处理
+    /**
+     * 返回当前用户在某周期内可见的考核主表 ID 集合（叠加角色可见性条件）。
+     * @param periodId 考核周期 ID，可为空表示不限定周期
+     */
     public List<Long> visibleTableIds(Long periodId) {
 
         QueryWrapper<AssessmentTable> qw = new QueryWrapper<>();

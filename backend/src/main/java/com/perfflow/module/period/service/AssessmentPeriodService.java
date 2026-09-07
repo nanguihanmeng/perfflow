@@ -19,7 +19,9 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-// 考核周期业务逻辑：列表、当前周期、创建、开放、关闭。
+/**
+ * 考核周期业务：周期列表、当前生效周期、创建、开放（按类型生成考核表）与关闭。
+ */
 @Service
 @RequiredArgsConstructor
 public class AssessmentPeriodService {

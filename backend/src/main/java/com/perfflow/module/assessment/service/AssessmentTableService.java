@@ -33,9 +33,10 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
-//
- // 考核主表服务：承担状态机驱动的所有写动作、查询与初始化模板。
- //
+/**
+ * 个人考核主表服务：提供主表/明细查询，以及由状态机驱动的提交、推送、审核、评分、挂起延长等写动作，
+ * 并按周期为被考核人生成考核模板。写动作统一走"原子条件更新"，防止并发下重复流转。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -54,11 +55,10 @@ public class AssessmentTableService {
     private final AssessmentCalcService calcService;
     private final AssessmentPermissionService perm;
     private final AssessmentFlowService flowService;
-    //
-     // 原子条件更新：仅当仍处于期望状态才流转，防并发重复提交。
-     //
-
-     //
+    /**
+     * 原子条件更新：仅当主表仍处于 fromState 时才置为 toState，避免并发重复流转；
+     * 返回是否更新成功。
+     */
     private boolean transitionState(Long tableId, AssessmentState fromState,
                                     AssessmentState toState,
                                     Consumer<LambdaUpdateWrapper<AssessmentTable>> extraSetter) {
@@ -135,11 +135,6 @@ public class AssessmentTableService {
         tableMapper.deleteById(id);
     }
 
-    //
-
-     //
-
-     //
     public AssessmentTableResp getDetail(Long id) {
         AssessmentTable t = getRequired(id);
         // 查询列表
@@ -165,12 +160,8 @@ public class AssessmentTableService {
         // 返回结果
         return resp;
     }
-
-    //
      // 分页查询考核主表。
-     //
 
-     //
     public Page<AssessmentTableResp> listPage(Long periodId, Long deptId, String state,
                                               int pageNo, int pageSize) {
         QueryWrapper<AssessmentTable> qw = new QueryWrapper<>();
@@ -201,13 +192,7 @@ public class AssessmentTableService {
     }
 
     // ==================== 状态机写动作 ====================
-    //
      // 员工提交自评，自评中流转至自评挂起。
-     //
-
-     //
-
-     //
     @Transactional
     public void submit(Long tableId) {
         AssessmentTable t = getRequired(tableId);
@@ -263,11 +248,8 @@ public class AssessmentTableService {
         log.info("员工提交考核表: tableId={}, userId={}", tableId, t.getUserId());
     }
 
-    //
      // HR 推送挂起考核表进入部门审核（无部门则直达领导评分）。
-     //
 
-     //
     @Transactional
     public void push(Long tableId) {
         AssessmentTable t = getRequired(tableId);
@@ -293,11 +275,8 @@ public class AssessmentTableService {
         log.info("人事推送考核表: tableId={}, 目标状态={}", tableId, target);
     }
 
-    //
      // 部门负责人审核通过，流转至领导评分。
-     //
 
-     //
     @Transactional
     public void approve(Long tableId, String comment) {
         AssessmentTable t = getRequired(tableId);
@@ -321,11 +300,8 @@ public class AssessmentTableService {
         log.info("部门负责人提交考核表给领导: tableId={}, deptId={}", tableId, t.getDeptId());
     }
 
-    //
      // 部门负责人打回自评，解冻行。
-     //
 
-     //
     @Transactional
     public void reject(Long tableId, String comment) {
         // 条件分支
@@ -356,13 +332,8 @@ public class AssessmentTableService {
         log.info("部门负责人打回考核表: tableId={}, comment={}", tableId, comment);
     }
 
-    //
      // 领导/委员会评分，流转至已完成。
-     //
 
-     //
-
-     //
     @Transactional
     public void leadScore(Long tableId, BigDecimal leaderScore, String comment) {
         // 判空处理
@@ -417,11 +388,8 @@ public class AssessmentTableService {
         log.info("领导评分完成: tableId={}, score={}", tableId, leaderScore);
     }
 
-    //
      // 延长挂起天数，累计不超过上限。
-     //
 
-     //
     @Transactional
     public void extendSuspend(Long tableId, int days, String reason) {
         AssessmentTable t = getRequired(tableId);
@@ -454,46 +422,31 @@ public class AssessmentTableService {
     }
 
     // ==================== 模板初始化 ====================
-    //
-     // 按周期与员工查询考核主表。
-     //
 
-     //
+     // 按周期与员工查询考核主表。
     public AssessmentTable findByPeriodAndUser(Long periodId, Long userId) {
         // 查询单条
         return tableMapper.selectOne(new QueryWrapper<AssessmentTable>()
                 .eq("period_id", periodId).eq("user_id", userId).last("LIMIT 1"));
     }
 
-    //
      // 查询某考核表全部行（按 seq 升序）。
-     //
 
-     //
     public List<AssessmentRow> listRows(Long tableId) {
         // 查询列表
         return rowMapper.selectList(
                 new QueryWrapper<AssessmentRow>().eq("table_id", tableId).orderByAsc("seq"));
     }
 
-    //
 
-     //
-
-     //
     @Transactional
     public void updateRow(AssessmentRow row) {
         // 更新记录
         rowMapper.updateById(row);
     }
 
-    //
      // 为周期内被考核人生成考核主表 + 10 行模板。
-     //
 
-     //
-
-     //
     @Transactional
     public void initForPeriod(AssessmentPeriod period, List<Long> userIds) {
         QueryWrapper<SysUser> qw = new QueryWrapper<SysUser>()
@@ -530,7 +483,6 @@ public class AssessmentTableService {
         }
     }
 
-    //
     private void createRowTemplate(Long tableId, RowCategory cat, int seq, int baseScore) {
         AssessmentRow r = new AssessmentRow();
         r.setTableId(tableId);
@@ -544,11 +496,9 @@ public class AssessmentTableService {
     }
 
     // ==================== 辅助 ====================
-    //
-     // 转换为主表响应对象，支持按数据权限脱敏。
-     //
 
-     //
+     // 转换为主表响应对象，支持按数据权限脱敏。
+
     public AssessmentTableResp toTableResp(AssessmentTable t, boolean masked) {
         AssessmentTableResp r = new AssessmentTableResp();
         r.setId(t.getId());
@@ -583,11 +533,8 @@ public class AssessmentTableService {
         return r;
     }
 
-    //
      // 转换为行响应对象，支持脱敏。
-     //
 
-     //
     public RowResp toRowResp(AssessmentRow row, boolean masked) {
         RowResp r = new RowResp();
         r.setId(row.getId());
@@ -612,21 +559,18 @@ public class AssessmentTableService {
         return r;
     }
 
-    //
     private String lookupUserName(Long uid) {
         // 查询单条
         SysUser u = userMapper.selectById(uid);
         return u == null ? null : u.getRealName();
     }
 
-    //
     private String lookupDeptName(Long did) {
         // 查询单条
         SysDepartment d = deptMapper.selectById(did);
         return d == null ? null : d.getName();
     }
 
-    //
     private String lookupDeptLeadName(Long deptId) {
         if (deptId == null) return null;
         // 查询单条
